@@ -60,6 +60,9 @@ async def stream_llm_response(
     model: str = None,
     api_key: str = None,
     api_base_url: str = None,
+    tools: list = None,
+    tool_choice: str = "auto",
+    temperature: float = 0.3,
 ):
     """Stream responses from the LLM.
 
@@ -68,6 +71,9 @@ async def stream_llm_response(
         model: Optional model override
         api_key: Optional API key override
         api_base_url: Optional API base URL override
+        tools: Optional list of tools to make available to the model
+        tool_choice: Optional specification for tool choice behavior
+        temperature: Optional temperature setting
 
     Yields:
         Direct chunks from the LiteLLM API
@@ -79,24 +85,89 @@ async def stream_llm_response(
         # Configure LLM with provided credentials
         configure_llm(api_key, api_base_url, model)
 
-        # Create the response stream with stop sequence
-        response = await litellm.acompletion(
-            model=model,
-            messages=messages,
-            stream=True,
-            temperature=0.3,
-            stop=["</tool_call>"],  # Stop after our explicit marker
-            extra_headers=litellm.headers
-        )
+        # Debug the model
+        print(f"Using model: {model}")
+        
+        # Determine if it's an Anthropic model 
+        is_anthropic = model and ("claude" in model.lower() or model.lower().startswith("anthropic/"))
+        
+        # Prepare completion parameters
+        completion_params = {
+            "model": model,
+            "messages": messages,
+            "stream": True,
+            "temperature": temperature,
+            "extra_headers": litellm.headers
+        }
+        
+        # For Anthropic models add API version header
+        if is_anthropic:
+            print("Using Anthropic model, adding API version header")
+            if "extra_headers" not in completion_params or not completion_params["extra_headers"]:
+                completion_params["extra_headers"] = {}
+            completion_params["extra_headers"]["anthropic-version"] = "2023-06-01"
+        
+        # Add tools if provided
+        if tools:
+            print(f"Adding {len(tools)} tools to completion params")
+            
+            # Ensure tools are properly formatted
+            valid_tools = []
+            for tool in tools:
+                if not isinstance(tool, dict):
+                    print(f"Warning: Skipping non-dict tool: {tool}")
+                    continue
+                    
+                if "type" not in tool or "function" not in tool:
+                    print(f"Warning: Tool missing required fields: {tool}")
+                    continue
+                    
+                if not isinstance(tool["function"], dict):
+                    print(f"Warning: Tool function is not a dict: {tool}")
+                    continue
+                    
+                if "name" not in tool["function"] or not tool["function"]["name"]:
+                    print(f"Warning: Tool missing function name: {tool}")
+                    continue
+                    
+                valid_tools.append(tool)
+            
+            # Only use tools if we have valid ones
+            if valid_tools:
+                completion_params["tools"] = valid_tools
+                completion_params["tool_choice"] = tool_choice
+                print(f"Using {len(valid_tools)} validated tools with model {model}")
+                # Debug first tool
+                if valid_tools:
+                    print(f"First tool: {valid_tools[0]['function']['name']}")
+            else:
+                # Fallback to stop token if no valid tools
+                print("No valid tools found, falling back to stop token")
+                completion_params["stop"] = ["</tool_call>"]  # Legacy stop sequence
+        else:
+            # Only use stop token if not using tools
+            completion_params["stop"] = ["</tool_call>"]  # Legacy stop sequence
+
+        # Debug params (excluding messages which could be long)
+        debug_params = completion_params.copy()
+        debug_params.pop("messages", None)
+        print(f"Completion params: {debug_params}")
+
+        # Create the response stream
+        response = await litellm.acompletion(**completion_params)
 
         # Simply yield each chunk directly
         async for chunk in response:
             yield chunk
 
     except Exception as e:
-        # Simple error handling - just print the error
+        # More detailed error handling
         print(f"\nError in stream_llm_response: {type(e).__name__}: {str(e)}")
         print(f"Messages: {len(messages)} items")
-
+        
+        # If it's a provider-specific error, provide more context
+        if hasattr(e, 'response') and hasattr(e.response, 'text'):
+            print(f"API Error details: {e.response.text}")
+        
         # Re-raise to let the caller handle it
         raise
