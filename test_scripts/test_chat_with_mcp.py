@@ -63,7 +63,8 @@ async def chat():
                     messages=messages,
                     model=model,
                     api_key=api_key,
-                    api_base_url=api_base_url
+                    api_base_url=api_base_url,
+                    tools=tools
                 ):
                     # Process the raw LiteLLM chunk
                     if hasattr(chunk, 'choices') and chunk.choices:

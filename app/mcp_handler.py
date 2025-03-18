@@ -97,8 +97,20 @@ class MCPHandler:
         """List available MCP tools in litellm tools format"""
         await self.ensure_initialized()
         tools = []
-        for tool in await self.list_tools():
-            pass
+        for tool in (await self.list_tools()).tools:
+            # Create a litellm-compatible tool definition
+            tool_def = {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description.strip(),
+                    "parameters": {}
+                }
+            }
+
+            tool_def["function"]["parameters"] = tool.inputSchema
+            tools.append(tool_def)
+            
         return tools
 
     async def call_tool(self, tool_name: str, **kwargs):

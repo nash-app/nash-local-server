@@ -23,6 +23,7 @@ async def stream_llm_response(
     model: str,
     api_key: Optional[str] = None,
     api_base_url: str = None,
+    tools: list = None
 ):
     """Stream responses from the LLM.
 
@@ -53,7 +54,8 @@ async def stream_llm_response(
             messages=messages,
             stream=True,
             temperature=0.3,
-            extra_headers=litellm.headers
+            extra_headers=litellm.headers,
+            tools=tools
         )
 
         # Simply yield each chunk directly
