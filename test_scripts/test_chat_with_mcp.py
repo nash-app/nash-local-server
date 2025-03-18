@@ -44,7 +44,8 @@ async def chat():
                 print_messages(messages)
                 continue
                 
-            # Add user message to history
+            # Add user message to history - using string format for simplicity
+            # This works with LiteLLM because it will convert to the appropriate format
             messages.append({
                 "role": "user",
                 "content": user_input
@@ -53,9 +54,10 @@ async def chat():
             while True:
                 # Stream AI response
                 print_assistant_header()
-                assistant_message = ""
                 
-                # Tool call tracking variables
+                # Initialize variables for the response
+                assistant_message = ""
+                tool_use_info = None
                 tool_call_chunks = []
                 collecting_tool_call = False
                 tool_call_id = None
@@ -146,75 +148,109 @@ async def chat():
                             print(f"\nTOOL CALL COMPLETE - Finish reason: {finish_reason}")
                             print(f"ACCUMULATED ARGS: {tool_args}")
                             
-                            # Format the tool call as a structured format in the assistant's message
-                            assistant_message = f"<tool_call>{{\"function\": {{\"name\": \"{tool_name}\", \"arguments\": {tool_args}}}}}</tool_call>"
+                            # Parse the arguments into a JSON object
+                            tool_arguments = json.loads(tool_args)
+                            
+                            # Instead of generating text, create a structured message for the tool use
+                            # This follows Claude's expected format for tool calls
+                            assistant_message = None  # Don't add text content
+                            tool_use_info = {
+                                "type": "tool_use",
+                                "id": tool_call_id,
+                                "name": tool_name,
+                                "input": tool_arguments
+                            }
                             collecting_tool_call = False
 
-                # Add assistant response to history 
-                if assistant_message:
-                    # Add the original assistant message to the history first
+                # Add response to history
+                
+                # Use OpenAI-compatible format (string content instead of structured array)
+                
+                # If we have a tool call, format as OpenAI function call
+                if tool_use_info:
+                    print("\nADDING TOOL USE TO ASSISTANT MESSAGE (OpenAI format):")
+                    print(f"Tool Name: {tool_use_info['name']}")
+                    print(f"Tool ID: {tool_use_info['id']}")
+                    print(f"Tool Input: {json.dumps(tool_use_info['input'], indent=2)}")
+                    
+                        # Use plain text format for the tool call to bypass litellm's validation
+                    # Just format the tool call as regular text content
+                    tool_call_text = f"\nI'm using the '{tool_use_info['name']}' tool with these parameters:\n"
+                    tool_call_text += json.dumps(tool_use_info["input"], indent=2)
+                    
+                    if assistant_message:
+                        message = {
+                            "role": "assistant",
+                            "content": assistant_message + tool_call_text
+                        }
+                    else:
+                        message = {
+                            "role": "assistant",
+                            "content": tool_call_text
+                        }
+                # Otherwise just use the text message
+                elif assistant_message:
                     message = {
                         "role": "assistant",
                         "content": assistant_message
                     }
-                    messages.append(message)
-
-                    # Check if we have a tool call to process
-                    if tool_name and tool_args and collecting_tool_call == False:
-                        print("\nPROCESSING DETECTED TOOL CALL:")
-                        print(f"Tool Name: {tool_name}")
-                        print(f"Tool Args: {tool_args}")
-                        
-                        try:
-                            # Parse the arguments JSON if needed
-                            # Arguments should already be a valid JSON string from the stream
-                            tool_arguments = json.loads(tool_args)
-                            
-                            print("EXECUTING TOOL DIRECTLY VIA MCP_HANDLER:")
-                            # Execute the tool directly using MCPHandler
-                            tool_result = await mcp.call_tool(tool_name, arguments=tool_arguments)
-                            
-                            # Extract the text content from the tool result
-                            result_text = ""
-                            
-                            # Try to extract text from the content field if available
-                            if hasattr(tool_result, 'content') and tool_result.content:
-                                # If it's a list of content items
-                                if isinstance(tool_result.content, list):
-                                    for content_item in tool_result.content:
-                                        if hasattr(content_item, 'text'):
-                                            result_text += content_item.text
-                                # If it's a single content item
-                                elif hasattr(tool_result.content, 'text'):
-                                    result_text = tool_result.content.text
-                            
-                            # If we couldn't extract text content, fall back to string representation
-                            if not result_text:
-                                result_text = str(tool_result)
-                            
-                            # Format for display
-                            formatted_result = f"<tool_results>\n{result_text}\n</tool_results>"
-                            
-                            # Store the original tool call in the message for history
-                            formatted_tool_call = f"<tool_call>{{\"function\": {{\"name\": \"{tool_name}\", \"arguments\": {tool_args}}}}}</tool_call>"
-                            message['content'] = formatted_tool_call
-                            
-                            print("TOOL CALL RESULT --------------------------------------------------------")
-                            print(formatted_result)
-                            print("END RESULT --------------------------------------------------------")
-                            
-                            # Add the tool result to the conversation
-                            messages.append({
-                                "role": "assistant",
-                                "content": f"Tool result: {formatted_result}",
-                            })
-                        except Exception as e:
-                            print(f"\nError executing tool directly: {str(e)}")
-                            break
-                    else:
-                        # No tool call detected, nothing to process
-                        break
                 else:
+                    message = None
+                
+                # Add the message if we have one
+                if message:
+                    messages.append(message)
+                    
+                    # For regular text messages (no tool call), break the loop
+                    if not tool_use_info:
+                        break
+                    
+                    # If we have a tool call, execute it
+                    try:
+                        print("EXECUTING TOOL DIRECTLY VIA MCP_HANDLER:")
+                        # Execute the tool with the parsed arguments
+                        tool_result = await mcp.call_tool(tool_use_info['name'], arguments=tool_use_info['input'])
+                        
+                        # Extract the text content from the tool result
+                        result_text = ""
+                        
+                        # Try to extract text from the content field if available
+                        if hasattr(tool_result, 'content') and tool_result.content:
+                            # If it's a list of content items
+                            if isinstance(tool_result.content, list):
+                                for content_item in tool_result.content:
+                                    if hasattr(content_item, 'text'):
+                                        result_text += content_item.text
+                            # If it's a single content item
+                            elif hasattr(tool_result.content, 'text'):
+                                result_text = tool_result.content.text
+                        
+                        # If we couldn't extract text content, fall back to string representation
+                        if not result_text:
+                            result_text = str(tool_result)
+                        
+                        print("TOOL RESULT --------------------------------------------------------")
+                        print(result_text)
+                        print("END RESULT --------------------------------------------------------")
+                        
+                        # Format tool results as a user message with plain text content
+                        # This bypasses all the validation issues with litellm
+                        messages.append({
+                            "role": "user",
+                            "content": f"Results from executing {tool_use_info['name']}:\n\n{result_text}"
+                        })
+                    except Exception as e:
+                        error_message = str(e)
+                        print(f"\nError executing tool: {error_message}")
+                        
+                        # Format error as a user message with plain text content
+                        messages.append({
+                            "role": "user",
+                            "content": f"Error when executing {tool_use_info['name']}: {error_message}"
+                        })
+                else:
+                    # No content to add
+                    print("No valid assistant message or tool use detected.")
                     break
             
     except Exception as e:
