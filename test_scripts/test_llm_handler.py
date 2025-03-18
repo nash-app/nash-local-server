@@ -2,10 +2,7 @@ import asyncio
 import json
 import os
 from dotenv import load_dotenv
-from app.llm_handler import (
-    stream_llm_response,
-    summarize_conversation
-)
+from app.llm_handler import stream_llm_response
 
 
 def print_setup_instructions():
@@ -113,39 +110,14 @@ async def chat():
         return
     
     messages = []
-    session_id = None
     
     try:
         while True:
             # Get user input
-            prompt = "\nYou (type 'summarize' to test summarization, " \
-                    "'quit' to exit): "
+            prompt = "\nYou (type 'quit' to exit): "
             user_input = input(prompt).strip()
             if user_input.lower() in ['quit', 'exit', 'bye']:
                 break
-            
-            if user_input.lower() == 'summarize':
-                if len(messages) < 2:
-                    print("Not enough messages to summarize yet.")
-                    continue
-                
-                print("\nSummarizing conversation...")
-                result = await summarize_conversation(
-                    messages=messages,
-                    model=model,
-                    api_key=api_key,
-                    api_base_url=api_base_url,
-                    session_id=session_id
-                )
-                
-                if "error" in result:
-                    print("Error:", result["error"])
-                else:
-                    print("\nSummary:", result["summary"])
-                    print("\nToken reduction:", result["token_reduction"])
-                    messages = result["messages"]
-                    session_id = result["session_id"]
-                continue
                 
             # Add user message to history
             messages.append({
@@ -162,30 +134,14 @@ async def chat():
                 model=model,
                 api_key=api_key,
                 api_base_url=api_base_url,
-                session_id=session_id
+                tools=[]  # Pass empty tools list
             ):
-                if "error" in chunk:
-                    error_data = json.loads(chunk.replace("data: ", ""))
-                    print("\nError:", error_data["error"])
-                    break
-                
-                if "session_id" in chunk:
-                    session_data = json.loads(chunk.replace("data: ", ""))
-                    session_id = session_data["session_id"]
-                    continue
-                
-                if "warning" in chunk:
-                    warning_data = json.loads(chunk.replace("data: ", ""))
-                    print("\nWarning:", warning_data["warning"])
-                    suggestions = warning_data["warning"]["suggestions"]
-                    print("Suggestions:", "\n- ".join([""] + suggestions))
-                    continue
-                
-                if "[DONE]" not in chunk:
-                    content = json.loads(
-                        chunk.replace("data: ", "")
-                    ).get("content", "")
-                    if content:
+                # Process the raw LiteLLM chunk
+                if hasattr(chunk, 'choices') and chunk.choices:
+                    # Extract the content from the choices
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, 'content') and delta.content:
+                        content = delta.content
                         print(content, end="", flush=True)
                         assistant_message += content
             
@@ -196,7 +152,7 @@ async def chat():
                     "content": assistant_message
                 })
             
-            print(f"\n(Session ID: {session_id})")
+            # No session ID printing
             
     except Exception as e:
         print(f"\nError during chat: {e}")
