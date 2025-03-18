@@ -222,6 +222,7 @@ async def stream_completion(request: StreamRequest):
                 session_id=request.session_id,
             ),
             media_type="text/event-stream",
+            headers={"Access-Control-Allow-Origin": "*"}
         )
     except Exception as e:
         return StreamingResponse(error_stream(str(e)), media_type="text/event-stream", status_code=500)
