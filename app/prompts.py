@@ -1,3 +1,4 @@
+# flake8: noqa: E501
 def get_system_prompt() -> str:
     return """
 # Assistant Identity and Capabilities

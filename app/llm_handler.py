@@ -9,7 +9,7 @@ def configure_llm(api_key: Optional[str] = None, api_base_url: str = None, model
         litellm.api_key = api_key
     else:
         litellm.api_key = None
-        
+
     # Set API base URL if provided
     if api_base_url:
         litellm.api_base = api_base_url
@@ -19,11 +19,7 @@ def configure_llm(api_key: Optional[str] = None, api_base_url: str = None, model
 
 
 async def stream_llm_response(
-    messages: list,
-    model: str,
-    api_key: Optional[str] = None,
-    api_base_url: str = None,
-    tools: list = None
+    messages: list, model: str, api_key: Optional[str] = None, api_base_url: str = None, tools: list = None
 ):
     """Stream responses from the LLM.
 
@@ -50,12 +46,7 @@ async def stream_llm_response(
 
         # Create the response stream with stop sequence
         response = await litellm.acompletion(
-            model=model,
-            messages=messages,
-            stream=True,
-            temperature=0.3,
-            extra_headers=litellm.headers,
-            tools=tools
+            model=model, messages=messages, stream=True, temperature=0.3, extra_headers=litellm.headers, tools=tools
         )
 
         # Simply yield each chunk directly
