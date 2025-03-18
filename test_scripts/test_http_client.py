@@ -3,7 +3,6 @@ import json
 import sys
 from typing import Generator, List, Dict, Optional
 from test_scripts.api_credentials import get_api_credentials, print_credentials_info
-from test_scripts.tool_parser import parse_tool_call, format_tool_result
 
 
 class Conversation:
@@ -198,29 +197,7 @@ def stream_response(
         print(f"\nError: {str(e)}")
         return None
 
-def call_mcp_tool(tool_name: str, arguments: dict) -> str:
-    """Call an MCP tool through the server API."""
-    try:
-        payload = {
-            "tool_name": tool_name,
-            "arguments": arguments
-        }
-        
-        response = requests.post(
-            "http://localhost:6274/v1/mcp/call_tool",
-            json=payload
-        )
-        
-        if response.status_code != 200:
-            return f"Error calling tool: Server returned status code {response.status_code}"
-        
-        result = response.json()
-        if "result" in result:
-            return str(result["result"])
-        else:
-            return str(result)
-    except Exception as e:
-        return f"Error calling tool: {str(e)}"
+# Tool execution is now handled by the server
 
 
 # Using print_credentials_info imported from api_credentials.py
@@ -317,53 +294,8 @@ def chat_loop():
                 if response_text:
                     conversation.add_message("assistant", response_text)
                 
-                # Check if response contains a tool call pattern
-                if "<tool_call>" in response_text:
-                    print("\nTool call detected in response. Executing...")
-                    
-                    # Add closing tag if it's missing (similar to test_chat_with_mcp.py)
-                    if "</tool_call>" not in response_text:
-                        message_with_closing_tag = response_text + "</tool_call>"
-                        print("Adding missing closing tag to tool call")
-                    else:
-                        message_with_closing_tag = response_text
-                    
-                    # Use the shared parser to extract tool call information
-                    parsed = parse_tool_call(message_with_closing_tag)
-                    
-                    if parsed['tool_call_found']:
-                        tool_name = parsed['tool_name']
-                        arguments = parsed['arguments']
-                        
-                        print(f"Calling tool: {tool_name}")
-                        
-                        # Call the tool via the server API
-                        tool_result = call_mcp_tool(tool_name, arguments)
-                        
-                        # Format the result using the shared formatter
-                        formatted_result = format_tool_result(tool_result)
-                        
-                        # Display the result
-                        print(f"\nTool result: {tool_result}")
-                        
-                        # Persist the end tag in the assistant message
-                        if "</tool_call>" not in response_text:
-                            conversation.messages[-1]['content'] += "</tool_call>"
-                        
-                        # Add the tool result as an assistant message
-                        conversation.add_message("assistant", f"Tool result: {formatted_result}")
-                        
-                        # Continue the loop to get another response from the LLM
-                        print("\nTOOL CALL --------------------------------------------------------")
-                        print(formatted_result)
-                        print("END CALL --------------------------------------------------------")
-                        
-                        # Continue to next iteration (get another assistant response)
-                        continue
-                    elif parsed['error']:
-                        print(f"Error processing tool call: {parsed['error']}")
-                    else:
-                        print("Could not parse tool call")
+                # No need to check for tool calls - the server handles all tool execution
+                # The client just receives and displays the results
                 
                 # If we got a tool result from streaming, add it as an assistant message
                 if received_tool_result:
