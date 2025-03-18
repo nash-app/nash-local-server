@@ -65,6 +65,23 @@ async def chat():
                 tool_call_id = None
                 tool_name = None
                 tool_args = ""
+                
+                # STREAMING RESPONSE PROCESSING
+                # This async loop processes the streamed response from the LLM via litellm.
+                # 
+                # How streaming works:
+                # 1. The response comes in chunks, each chunk containing a delta (new content)
+                # 2. For regular text responses, delta.content contains text fragments to display
+                # 3. For tool calls, delta.tool_calls contains structured JSON objects
+                #
+                # Tool call streaming format:
+                # - Each chunk contains part of a tool call, delivered as structured data
+                # - First chunk typically has the tool call ID and function name
+                # - Subsequent chunks contain fragments of the arguments JSON
+                # - The final chunk includes a finish_reason indicating completion
+                #
+                # We accumulate these fragments to rebuild the complete tool call, then
+                # format it for processing using the existing tool_processor logic.
             
                 async for chunk in stream_llm_response(
                     messages=messages,
@@ -75,11 +92,15 @@ async def chat():
                 ):
                     # Process the raw LiteLLM chunk
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        # Extract the delta from the choices
+                        # Extract the delta from the choices (delta = what's new in this chunk)
                         delta = chunk.choices[0].delta
+                        # The finish_reason will only appear in the final chunk when generation is complete
                         finish_reason = chunk.choices[0].finish_reason if hasattr(chunk.choices[0], 'finish_reason') else None
                         
-                        # Check for tool calls in the delta
+                        # HANDLING TOOL CALLS
+                        # Tool calls come through delta.tool_calls rather than delta.content
+                        # delta.tool_calls is an array of structured objects, not plain text
+                        # Each call has: id, type, function{name, arguments}
                         if hasattr(delta, 'tool_calls') and delta.tool_calls:
                             # We're receiving a tool call
                             collecting_tool_call = True
@@ -88,36 +109,49 @@ async def chat():
                             tool_call_chunks.append(delta.tool_calls)
                             
                             # Process the tool call
+                            # We iterate through each tool_call in the array (usually just one)
                             for tool_call in delta.tool_calls:
-                                # Get the tool call ID if this is the first chunk
+                                # TOOL CALL ID PROCESSING
+                                # The ID typically comes in the first chunk only
+                                # We use 'if not tool_call_id' to ensure we only capture it once
                                 if not tool_call_id and hasattr(tool_call, 'id'):
                                     tool_call_id = tool_call.id
                                     print(f"\nTOOL CALL ID: {tool_call_id}")
                                 
-                                # Get the function information
+                                # FUNCTION INFORMATION PROCESSING
                                 if hasattr(tool_call, 'function'):
-                                    # Extract tool name
+                                    # TOOL NAME PROCESSING
+                                    # Tool name typically comes in the first chunk with the ID
+                                    # We only store it once using 'if not tool_name'
                                     if hasattr(tool_call.function, 'name') and tool_call.function.name:
                                         if not tool_name:
                                             tool_name = tool_call.function.name
                                             print(f"\nTOOL NAME: {tool_name}")
                                     
-                                    # Extract and accumulate arguments
+                                    # ARGUMENTS PROCESSING
+                                    # Arguments often come split across multiple chunks
+                                    # We concatenate each piece to build the complete JSON
                                     if hasattr(tool_call.function, 'arguments') and tool_call.function.arguments:
                                         tool_args += tool_call.function.arguments
                         
-                        # Check for regular content
+                        # REGULAR CONTENT PROCESSING
+                        # If this isn't a tool call, it's regular content in delta.content
                         elif hasattr(delta, 'content') and delta.content:
                             content = delta.content
+                            # Print immediately for streaming effect
                             print(content, end="", flush=True)
+                            # Accumulate to build the complete message
                             assistant_message += content
                         
-                        # Check if we've reached the end of a tool call
+                        # TOOL CALL COMPLETION DETECTION
+                        # The final chunk of a tool call includes finish_reason
+                        # This signals we have received the complete tool call
                         if collecting_tool_call and finish_reason:
                             print(f"\nTOOL CALL COMPLETE - Finish reason: {finish_reason}")
                             print(f"ACCUMULATED ARGS: {tool_args}")
                             
-                            # Format the tool call into the expected format
+                            # Format the assembled tool call into the XML-style format
+                            # that our existing tool_processor expects
                             assistant_message = f"<tool_call>{{\"function\": {{\"name\": \"{tool_name}\", \"arguments\": {tool_args}}}}}</tool_call>"
                             collecting_tool_call = False
 
