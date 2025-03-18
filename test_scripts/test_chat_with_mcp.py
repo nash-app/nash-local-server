@@ -58,6 +58,13 @@ async def chat():
                 # Stream AI response
                 print_assistant_header()
                 assistant_message = ""
+                
+                # Tool call tracking variables
+                tool_call_chunks = []
+                collecting_tool_call = False
+                tool_call_id = None
+                tool_name = None
+                tool_args = ""
             
                 async for chunk in stream_llm_response(
                     messages=messages,
@@ -68,13 +75,52 @@ async def chat():
                 ):
                     # Process the raw LiteLLM chunk
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        # Extract the content from the choices
+                        # Extract the delta from the choices
                         delta = chunk.choices[0].delta
-                        if hasattr(delta, 'content') and delta.content:
+                        finish_reason = chunk.choices[0].finish_reason if hasattr(chunk.choices[0], 'finish_reason') else None
+                        
+                        # Check for tool calls in the delta
+                        if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                            # We're receiving a tool call
+                            collecting_tool_call = True
+                            
+                            # Store the raw tool call data
+                            tool_call_chunks.append(delta.tool_calls)
+                            
+                            # Process the tool call
+                            for tool_call in delta.tool_calls:
+                                # Get the tool call ID if this is the first chunk
+                                if not tool_call_id and hasattr(tool_call, 'id'):
+                                    tool_call_id = tool_call.id
+                                    print(f"\nTOOL CALL ID: {tool_call_id}")
+                                
+                                # Get the function information
+                                if hasattr(tool_call, 'function'):
+                                    # Extract tool name
+                                    if hasattr(tool_call.function, 'name') and tool_call.function.name:
+                                        if not tool_name:
+                                            tool_name = tool_call.function.name
+                                            print(f"\nTOOL NAME: {tool_name}")
+                                    
+                                    # Extract and accumulate arguments
+                                    if hasattr(tool_call.function, 'arguments') and tool_call.function.arguments:
+                                        tool_args += tool_call.function.arguments
+                        
+                        # Check for regular content
+                        elif hasattr(delta, 'content') and delta.content:
                             content = delta.content
                             print(content, end="", flush=True)
                             assistant_message += content
-            
+                        
+                        # Check if we've reached the end of a tool call
+                        if collecting_tool_call and finish_reason:
+                            print(f"\nTOOL CALL COMPLETE - Finish reason: {finish_reason}")
+                            print(f"ACCUMULATED ARGS: {tool_args}")
+                            
+                            # Format the tool call into the expected format
+                            assistant_message = f"<tool_call>{{\"function\": {{\"name\": \"{tool_name}\", \"arguments\": {tool_args}}}}}</tool_call>"
+                            collecting_tool_call = False
+
                 # Add assistant response to history 
                 if assistant_message:
                     # Add the original assistant message to the history first
@@ -84,20 +130,49 @@ async def chat():
                     }
                     messages.append(message)
 
-                    # Process any tool calls in the message
-                    tool_call_result = await process_tool_call(assistant_message + "</tool_call>", mcp)
-                    if tool_call_result['tool_call_made']:
-                        message['content'] += "</tool_call></tool_call></tool_call></tool_call></tool_call></tool_call>"  # persist the end tag in the assistant message because the termination string isn't included and this is a case where the termination string was hit
-                        print("TOOL CALL --------------------------------------------------------")
-                        print(tool_call_result['formatted_result'])
-                        print("END CALL --------------------------------------------------------")
-                        # message['content'] += f"\n{tool_call_result['formatted_result']}"
-                        messages.append({
-                            "role": "assistant",
-                            "content": f"Tool result: {tool_call_result['formatted_result']}",
-                        })
+                    # Check if we have a tool call to process
+                    if tool_name and tool_args and collecting_tool_call == False:
+                        print("\nPROCESSING DETECTED TOOL CALL:")
+                        print(f"Tool Name: {tool_name}")
+                        print(f"Tool Args: {tool_args}")
+                        
+                        # Ensure the tool call format is correct for process_tool_call
+                        # The tool call parser expects the </tool_call> tag
+                        formatted_tool_call = assistant_message + "</tool_call>"
+                        
+                        # Process the tool call
+                        tool_call_result = await process_tool_call(formatted_tool_call, mcp)
+                        
+                        if tool_call_result['tool_call_made']:
+                            # Update the message to persist the properly formatted tool call
+                            message['content'] = formatted_tool_call
+                            
+                            print("TOOL CALL --------------------------------------------------------")
+                            print(tool_call_result['formatted_result'])
+                            print("END CALL --------------------------------------------------------")
+                            
+                            # Add the tool result to the conversation
+                            messages.append({
+                                "role": "assistant",
+                                "content": f"Tool result: {tool_call_result['formatted_result']}",
+                            })
+                        else:
+                            print(f"\nError processing tool call: {tool_call_result.get('error', 'Unknown error')}")
+                            break
                     else:
-                        break
+                        # Process any traditional tool calls in the message format (for backward compatibility)
+                        tool_call_result = await process_tool_call(assistant_message + "</tool_call>", mcp)
+                        if tool_call_result['tool_call_made']:
+                            message['content'] += "</tool_call></tool_call></tool_call></tool_call></tool_call></tool_call>"  # persist the end tag
+                            print("LEGACY TOOL CALL --------------------------------------------------------")
+                            print(tool_call_result['formatted_result'])
+                            print("END LEGACY CALL --------------------------------------------------------")
+                            messages.append({
+                                "role": "assistant",
+                                "content": f"Tool result: {tool_call_result['formatted_result']}",
+                            })
+                        else:
+                            break
                     
                     #if tool_call_result['tool_call_made']:
                     #    # Print tool call details

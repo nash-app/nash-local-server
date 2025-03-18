@@ -89,21 +89,47 @@ async def process_llm_stream(
 ):
     """Format LLM responses into proper SSE format."""
     # Stream content chunks
+    tool_call_chunks = []  # To collect tool call chunks if they start coming
+    collecting_tool_call = False
+    
     try:
         async for chunk in stream_llm_response(
             messages=messages,
             model=model,
             api_key=api_key,
-            api_base_url=api_base_url
+            api_base_url=api_base_url,
+            tools=MCPHandler.get_instance().list_tools_litellm() if hasattr(MCPHandler, 'get_instance') else None
         ):
             # Process the raw LiteLLM chunk
             if hasattr(chunk, 'choices') and chunk.choices:
-                # Extract the content from the choices
+                # Extract the delta from the choices
                 delta = chunk.choices[0].delta
-                if hasattr(delta, 'content') and delta.content:
+                
+                # Check for tool calls in the delta
+                if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                    # We're receiving a tool call
+                    collecting_tool_call = True
+                    tool_call_chunks.append(delta.tool_calls)
+                    # Send a special event to indicate a tool call is in progress
+                    yield f"data: {json.dumps({'tool_call_in_progress': True})}\n\n"
+                
+                # Check for regular content
+                elif hasattr(delta, 'content') and delta.content:
                     content = delta.content
                     # Format as SSE event
                     yield f"data: {json.dumps({'content': content})}\n\n"
+                
+                # Check if this is the end of a tool call
+                if collecting_tool_call and hasattr(chunk, 'choices') and chunk.choices[0].finish_reason:
+                    # Tool call is complete
+                    # Format and send the complete tool call
+                    complete_tool_call = {
+                        'tool_call': tool_call_chunks,
+                        'finished': True
+                    }
+                    yield f"data: {json.dumps(complete_tool_call)}\n\n"
+                    tool_call_chunks = []
+                    collecting_tool_call = False
     except Exception as e:
         # Handle errors in streaming
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
