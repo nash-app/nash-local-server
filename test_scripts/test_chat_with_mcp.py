@@ -4,10 +4,8 @@ from app.llm_handler import configure_llm, stream_llm_response
 from app.mcp_handler import MCPHandler
 from app.prompts import get_system_prompt
 from test_scripts.api_credentials import get_api_credentials, print_credentials_info
-from test_scripts.tool_processor import process_tool_call
 from test_scripts.message_display import (
-    print_messages, print_user_prompt, print_assistant_header,
-    print_tool_header, print_tool_details
+    print_messages, print_user_prompt, print_assistant_header
 )
 
 
@@ -37,8 +35,6 @@ async def chat():
 
     try:
         while True:
-            # Print current message history
-            
             # Get user input
             print_user_prompt()
             user_input = input("").strip()
@@ -81,7 +77,7 @@ async def chat():
                 # - The final chunk includes a finish_reason indicating completion
                 #
                 # We accumulate these fragments to rebuild the complete tool call, then
-                # format it for processing using the existing tool_processor logic.
+                # use the MCPHandler to directly execute the tool with the extracted information.
             
                 async for chunk in stream_llm_response(
                     messages=messages,
@@ -150,8 +146,7 @@ async def chat():
                             print(f"\nTOOL CALL COMPLETE - Finish reason: {finish_reason}")
                             print(f"ACCUMULATED ARGS: {tool_args}")
                             
-                            # Format the assembled tool call into the XML-style format
-                            # that our existing tool_processor expects
+                            # Format the tool call as a structured format in the assistant's message
                             assistant_message = f"<tool_call>{{\"function\": {{\"name\": \"{tool_name}\", \"arguments\": {tool_args}}}}}</tool_call>"
                             collecting_tool_call = False
 
@@ -170,99 +165,55 @@ async def chat():
                         print(f"Tool Name: {tool_name}")
                         print(f"Tool Args: {tool_args}")
                         
-                        # Ensure the tool call format is correct for process_tool_call
-                        # The tool call parser expects the </tool_call> tag
-                        formatted_tool_call = assistant_message + "</tool_call>"
-                        
-                        # Process the tool call
-                        tool_call_result = await process_tool_call(formatted_tool_call, mcp)
-                        
-                        if tool_call_result['tool_call_made']:
-                            # Update the message to persist the properly formatted tool call
+                        try:
+                            # Parse the arguments JSON if needed
+                            # Arguments should already be a valid JSON string from the stream
+                            tool_arguments = json.loads(tool_args)
+                            
+                            print("EXECUTING TOOL DIRECTLY VIA MCP_HANDLER:")
+                            # Execute the tool directly using MCPHandler
+                            tool_result = await mcp.call_tool(tool_name, arguments=tool_arguments)
+                            
+                            # Extract the text content from the tool result
+                            result_text = ""
+                            
+                            # Try to extract text from the content field if available
+                            if hasattr(tool_result, 'content') and tool_result.content:
+                                # If it's a list of content items
+                                if isinstance(tool_result.content, list):
+                                    for content_item in tool_result.content:
+                                        if hasattr(content_item, 'text'):
+                                            result_text += content_item.text
+                                # If it's a single content item
+                                elif hasattr(tool_result.content, 'text'):
+                                    result_text = tool_result.content.text
+                            
+                            # If we couldn't extract text content, fall back to string representation
+                            if not result_text:
+                                result_text = str(tool_result)
+                            
+                            # Format for display
+                            formatted_result = f"<tool_results>\n{result_text}\n</tool_results>"
+                            
+                            # Store the original tool call in the message for history
+                            formatted_tool_call = f"<tool_call>{{\"function\": {{\"name\": \"{tool_name}\", \"arguments\": {tool_args}}}}}</tool_call>"
                             message['content'] = formatted_tool_call
                             
-                            print("TOOL CALL --------------------------------------------------------")
-                            print(tool_call_result['formatted_result'])
-                            print("END CALL --------------------------------------------------------")
+                            print("TOOL CALL RESULT --------------------------------------------------------")
+                            print(formatted_result)
+                            print("END RESULT --------------------------------------------------------")
                             
                             # Add the tool result to the conversation
                             messages.append({
                                 "role": "assistant",
-                                "content": f"Tool result: {tool_call_result['formatted_result']}",
+                                "content": f"Tool result: {formatted_result}",
                             })
-                        else:
-                            print(f"\nError processing tool call: {tool_call_result.get('error', 'Unknown error')}")
+                        except Exception as e:
+                            print(f"\nError executing tool directly: {str(e)}")
                             break
                     else:
-                        # Process any traditional tool calls in the message format (for backward compatibility)
-                        tool_call_result = await process_tool_call(assistant_message + "</tool_call>", mcp)
-                        if tool_call_result['tool_call_made']:
-                            message['content'] += "</tool_call></tool_call></tool_call></tool_call></tool_call></tool_call>"  # persist the end tag
-                            print("LEGACY TOOL CALL --------------------------------------------------------")
-                            print(tool_call_result['formatted_result'])
-                            print("END LEGACY CALL --------------------------------------------------------")
-                            messages.append({
-                                "role": "assistant",
-                                "content": f"Tool result: {tool_call_result['formatted_result']}",
-                            })
-                        else:
-                            break
-                    
-                    #if tool_call_result['tool_call_made']:
-                    #    # Print tool call details
-                    #    print_tool_header()
-                    #    print_tool_details(
-                    #        tool_call_result['tool_name'],
-                    #        tool_call_result['arguments'],
-                    #        tool_call_result['result']
-                    #    )
-                    #    
-                    #    # Add the tool result as a system message
-                    #    messages.append({
-                    #        "role": "system", 
-                    #        "content": tool_call_result['formatted_result']
-                    #    })
-                    #    
-                    #    # Add a system message instructing the assistant to continue solving the problem
-                    #    messages.append({
-                    #        "role": "system", 
-                    #        "content": "Continue solving the user's request autonomously based on these tool results. If the results indicate an error or unexpected outcome, fix your approach and try again."
-                    #    })
-                    #    
-                    #    # Get LLM's response to the tool result
-                    #    print_assistant_header(responding_to_tool=True)
-                    #    assistant_response = ""
-                    #    async for chunk in stream_llm_response(
-                    #        messages=messages,
-                    #        model=model,
-                    #        api_key=api_key,
-                    #        api_base_url=api_base_url
-                    #    ):
-                    #        # Process the raw LiteLLM chunk
-                    #        if hasattr(chunk, 'choices') and chunk.choices:
-                    #            # Extract the content from the choices
-                    #            delta = chunk.choices[0].delta
-                    #            if hasattr(delta, 'content') and delta.content:
-                    #                content = delta.content
-                    #                # Skip printing if assistant is repeating function results
-                    #                skip_print = False
-                    #                if content.strip().startswith("<tool_results>"):
-                    #                    skip_print = True
-                    #                    
-                    #                if not skip_print:
-                    #                    print(content, end="", flush=True)
-                    #                assistant_response += content
-                    #    
-                    #    # Add the tool response to message history
-                    #    if assistant_response:
-                    #        # Update the assistant's response in the message history
-                    #        messages.append({
-                    #            "role": "assistant", 
-                    #            "content": assistant_response
-                    #        })
-                    #elif 'error' in tool_call_result:
-                    #    # There was an error processing the tool call
-                    #    print(f"\nError: {tool_call_result['error']}")
+                        # No tool call detected, nothing to process
+                        break
                 else:
                     break
             
