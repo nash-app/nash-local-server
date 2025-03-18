@@ -92,7 +92,15 @@ class MCPHandler:
         """List available MCP tools"""
         await self.ensure_initialized()
         return await self._session.list_tools()
-    
+
+    async def list_tools_litellm(self):
+        """List available MCP tools in litellm tools format"""
+        await self.ensure_initialized()
+        tools = []
+        for tool in await self.list_tools():
+            pass
+        return tools
+
     async def call_tool(self, tool_name: str, **kwargs):
         """Call an MCP tool with the given arguments"""
         await self.ensure_initialized()

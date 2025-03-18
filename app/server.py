@@ -5,13 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import json
 
-from .llm_handler import (
-    stream_llm_response, 
-    validate_api_key, InvalidAPIKeyError
-)
+from .llm_handler import stream_llm_response
 from .mcp_handler import MCPHandler
 from .prompts import get_system_prompt
-
 
 
 app = FastAPI(title="Nash LLM Server")
@@ -127,15 +123,6 @@ async def stream_completion(request: StreamRequest):
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
             yield "data: [DONE]\n\n"
 
-        try:
-            # Validate API key before starting stream
-            validate_api_key(request.api_key, request.model)
-        except InvalidAPIKeyError as e:
-            return StreamingResponse(
-                error_stream(str(e)),
-                media_type="text/event-stream",
-                status_code=401
-            )
         
         # Format the response
         return StreamingResponse(

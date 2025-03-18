@@ -26,9 +26,9 @@ async def chat():
     # Initialize MCP and get tool definitions
     mcp = MCPHandler.get_instance()
     await mcp.initialize()
-    tools = await mcp.list_tools()
+    tools = await mcp.list_tools_litellm()
 
-    system_prompt = get_system_prompt(tools)
+    system_prompt = get_system_prompt()
 
     messages.append({
         "role": "system",
