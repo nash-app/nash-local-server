@@ -111,11 +111,29 @@ async def process_llm_stream(
                 messages=conversation_messages, model=model, api_key=api_key, api_base_url=api_base_url, tools=tools
             ):
                 # Process each chunk with the stream processor
-                display_text = processor.process_chunk(chunk)
+                display_text, tool_call_data = processor.process_chunk(chunk)
 
                 # If there's text to display, send it as an SSE event
                 if display_text:
                     yield f"data: {json.dumps({'content': display_text})}\n\n"
+                
+                # If there's tool call data, send it to the client
+                if tool_call_data:
+                    # Convert tool call data to a serializable form
+                    serializable_tool_calls = []
+                    for tool_call in tool_call_data:
+                        tool_call_dict = {}
+                        if hasattr(tool_call, "id"):
+                            tool_call_dict["id"] = tool_call.id
+                        if hasattr(tool_call, "function"):
+                            tool_call_dict["function"] = {}
+                            if hasattr(tool_call.function, "name"):
+                                tool_call_dict["function"]["name"] = tool_call.function.name
+                            if hasattr(tool_call.function, "arguments"):
+                                tool_call_dict["function"]["arguments"] = tool_call.function.arguments
+                        serializable_tool_calls.append(tool_call_dict)
+                    
+                    yield f"data: {json.dumps({'tool_calls': serializable_tool_calls})}\n\n"
 
                 # If we're processing a tool call, send a notification
                 if processor.collecting_tool_call:

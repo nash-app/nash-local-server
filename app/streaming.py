@@ -35,10 +35,13 @@ class StreamProcessor:
             chunk: The raw chunk from the LLM streaming response
 
         Returns:
-            str: Any text content that should be displayed immediately,
-                 or None if no displayable content in this chunk
+            tuple: (display_text, tool_call_data)
+                display_text: Any text content that should be displayed immediately,
+                             or None if no displayable content in this chunk
+                tool_call_data: Raw tool call data from the model, or None if no tool call in this chunk
         """
         display_text = None
+        tool_call_data = None
 
         # Check if the chunk has choices
         if hasattr(chunk, "choices") and chunk.choices:
@@ -57,6 +60,9 @@ class StreamProcessor:
 
                 # Store the raw tool call data
                 self.tool_call_chunks.append(delta.tool_calls)
+                
+                # Capture raw tool call data to send to client
+                tool_call_data = delta.tool_calls
 
                 # Process the tool call
                 for tool_call in delta.tool_calls:
@@ -95,7 +101,7 @@ class StreamProcessor:
                         "input": {"raw_args": self.tool_args},
                     }
 
-        return display_text
+        return display_text, tool_call_data
 
     def is_tool_call_detected(self):
         """Check if a complete tool call was detected in the stream."""

@@ -126,6 +126,12 @@ def stream_response(
                             full_response += content
                             yield content
                             continue  # Continue to next chunk after handling content
+                            
+                        # Handle raw tool call data from the model
+                        elif "tool_calls" in parsed:
+                            tool_calls = parsed["tool_calls"]
+                            print(f"\nReceived tool call data: {json.dumps(tool_calls, indent=2)}")
+                            continue  # Continue to next chunk after handling tool call data
 
                         # Handle tool call in progress events
                         elif "tool_call_in_progress" in parsed:

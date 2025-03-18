@@ -54,12 +54,48 @@ async def chat():
                 async for chunk in stream_llm_response(
                     messages=messages, model=model, api_key=api_key, api_base_url=api_base_url, tools=tools
                 ):
-                    # Process each chunk and get any displayable content
-                    display_text = processor.process_chunk(chunk)
+                    # Process each chunk and get displayable content and tool call data
+                    display_text, tool_call_data = processor.process_chunk(chunk)
 
-                    # If there's text to display, print it
+                    # Set up content/tool call tracking
+                    if not hasattr(processor, "_content_mode"):
+                        # First chunk, initialize tracking
+                        processor._content_mode = None
+                        processor._tool_call_in_progress = False
+                        processor._first_chunk = True
+                    
+                    # Only care about content vs tool call state
                     if display_text:
+                        # This is a content chunk
+                        if processor._content_mode != "content":
+                            processor._content_mode = "content"
+                            print("\n[CONTENT] ", end="", flush=True)
                         print(display_text, end="", flush=True)
+                    
+                    # If this is a tool call, let's show the details
+                    if tool_call_data:
+                        # Only print the tool call marker once when we first detect a tool call
+                        if not processor._tool_call_in_progress:
+                            processor._tool_call_in_progress = True
+                            processor._content_mode = "tool_call"
+                            print("\n[TOOL_CALL] ", end="", flush=True)
+                        
+                        # Stream tool call information
+                        for tc in tool_call_data:
+                            # Extract content to display
+                            if hasattr(tc, "function"):
+                                # Create a more compact display format
+                                parts = []
+                                if hasattr(tc.function, "name") and tc.function.name:
+                                    parts.append(tc.function.name)
+                                if hasattr(tc.function, "arguments") and tc.function.arguments:
+                                    args = tc.function.arguments.strip()
+                                    if args:
+                                        parts.append(args)
+                                
+                                # If we have parts to display, print them
+                                if parts:
+                                    print(f"{' '.join(parts)} ", end="", flush=True)
 
                 # Get the message to add to history
                 message = processor.get_message_for_history()
