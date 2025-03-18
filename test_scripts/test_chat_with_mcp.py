@@ -235,6 +235,7 @@ async def chat():
                         
                         # Format tool results as a user message with plain text content
                         # This bypasses all the validation issues with litellm
+                        # In the future we hope litellm will support the proper anthropic format for tool results, see info here: https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview#handling-tool-use-and-tool-result-content-blocks
                         messages.append({
                             "role": "user",
                             "content": f"Results from executing {tool_use_info['name']}:\n\n{result_text}"
