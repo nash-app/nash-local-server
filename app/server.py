@@ -8,6 +8,7 @@ import json
 from .llm_handler import stream_llm_response
 from .mcp_handler import MCPHandler
 from .prompts import get_system_prompt
+from .streaming import StreamProcessor
 
 
 app = FastAPI(title="Nash LLM Server")
@@ -53,6 +54,10 @@ class StreamRequest(BaseRequest):
         ...,
         description="Model to use for completion"
     )
+    session_id: Optional[str] = Field(
+        None,
+        description="Session ID to use for the request"
+    )
 
 
 @app.on_event("startup")
@@ -65,8 +70,8 @@ async def startup_event():
     # Get available tools
     tools = await mcp.list_tools()
 
-    # Generate system prompt with tool definitions and store in app state
-    app.state.system_prompt = get_system_prompt(tools)
+    # Generate system prompt and store in app state
+    app.state.system_prompt = get_system_prompt()
 
 
 @app.on_event("shutdown")
@@ -86,53 +91,113 @@ async def process_llm_stream(
     model: str,
     api_key: str,
     api_base_url: str,
+    session_id: Optional[str] = None,
 ):
-    """Format LLM responses into proper SSE format."""
-    # Stream content chunks
-    tool_call_chunks = []  # To collect tool call chunks if they start coming
-    collecting_tool_call = False
+    """
+    Format LLM responses into proper SSE format, handling tool calls on the server.
     
-    try:
-        async for chunk in stream_llm_response(
-            messages=messages,
-            model=model,
-            api_key=api_key,
-            api_base_url=api_base_url,
-            tools=MCPHandler.get_instance().list_tools_litellm() if hasattr(MCPHandler, 'get_instance') else None
-        ):
-            # Process the raw LiteLLM chunk
-            if hasattr(chunk, 'choices') and chunk.choices:
-                # Extract the delta from the choices
-                delta = chunk.choices[0].delta
+    This function:
+    1. Streams the LLM response
+    2. Detects tool calls
+    3. Executes tools
+    4. Sends tool results back to the LLM
+    5. Continues the conversation
+    6. Streams everything to the client
+    """
+    # Initialize the stream processor
+    processor = StreamProcessor()
+    mcp = MCPHandler.get_instance()
+    
+    # Start by sending session ID if provided
+    if session_id:
+        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
+    
+    # Get available tools asynchronously
+    tools = await mcp.list_tools_litellm()
+    
+    # Keep track of the conversation
+    conversation_messages = messages.copy()
+    
+    # Continue the conversation until no more tool calls
+    while True:
+        # Reset the processor for this iteration
+        processor = StreamProcessor()
+        
+        try:
+            # Stream the LLM response
+            async for chunk in stream_llm_response(
+                messages=conversation_messages,
+                model=model,
+                api_key=api_key,
+                api_base_url=api_base_url,
+                tools=tools
+            ):
+                # Process each chunk with the stream processor
+                display_text = processor.process_chunk(chunk)
                 
-                # Check for tool calls in the delta
-                if hasattr(delta, 'tool_calls') and delta.tool_calls:
-                    # We're receiving a tool call
-                    collecting_tool_call = True
-                    tool_call_chunks.append(delta.tool_calls)
+                # If there's text to display, send it as an SSE event
+                if display_text:
+                    yield f"data: {json.dumps({'content': display_text})}\n\n"
+                    
+                # If we're processing a tool call, send a notification
+                if processor.collecting_tool_call:
                     # Send a special event to indicate a tool call is in progress
-                    yield f"data: {json.dumps({'tool_call_in_progress': True})}\n\n"
-                
-                # Check for regular content
-                elif hasattr(delta, 'content') and delta.content:
-                    content = delta.content
-                    # Format as SSE event
-                    yield f"data: {json.dumps({'content': content})}\n\n"
-                
-                # Check if this is the end of a tool call
-                if collecting_tool_call and hasattr(chunk, 'choices') and chunk.choices[0].finish_reason:
-                    # Tool call is complete
-                    # Format and send the complete tool call
-                    complete_tool_call = {
-                        'tool_call': tool_call_chunks,
-                        'finished': True
+                    tool_status = {
+                        'tool_call_in_progress': True
                     }
-                    yield f"data: {json.dumps(complete_tool_call)}\n\n"
-                    tool_call_chunks = []
-                    collecting_tool_call = False
-    except Exception as e:
-        # Handle errors in streaming
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    if processor.tool_name:
+                        tool_status['tool_name'] = processor.tool_name
+                    if processor.tool_call_id:
+                        tool_status['tool_id'] = processor.tool_call_id
+                    
+                    yield f"data: {json.dumps(tool_status)}\n\n"
+            
+            # Get the assistant's message to add to the conversation
+            assistant_message = processor.get_message_for_history()
+            if assistant_message:
+                conversation_messages.append(assistant_message)
+            
+            # If a tool call was detected, execute it and continue the conversation
+            if processor.is_tool_call_detected():
+                # Send notification that we're executing a tool
+                yield f"data: {json.dumps({'executing_tool': processor.tool_use_info['name']})}\n\n"
+                
+                # Execute the tool and get the result
+                tool_result = await processor.execute_tool(mcp)
+                
+                # Send the tool result to the client
+                tool_result_data = {
+                    'tool_result': {
+                        'name': processor.tool_use_info['name'],
+                        'success': tool_result['success'],
+                        'result': tool_result['result_text']
+                    }
+                }
+                yield f"data: {json.dumps(tool_result_data)}\n\n"
+                
+                # Add the tool result to the conversation
+                if tool_result['success'] and tool_result['result_message']:
+                    conversation_messages.append(tool_result['result_message'])
+                    
+                    # Yield a separator to indicate we're continuing with the LLM
+                    yield f"data: {json.dumps({'status': 'continuing_with_tool_result'})}\n\n"
+                    
+                    # Continue the loop - we'll get another response from the LLM
+                    continue
+            
+            # If we got here, there were no tool calls or we've completed all tool calls
+            break
+                
+        except Exception as e:
+            # Handle errors in streaming
+            error_message = str(e)
+            yield f"data: {json.dumps({'error': error_message})}\n\n"
+            print(f"Error in stream_llm_response: {error_message}")
+            break
+    
+    # Send session ID again at the end if provided
+    if session_id:
+        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
     
     # End of stream marker
     yield "data: [DONE]\n\n"
@@ -146,17 +211,21 @@ async def stream_completion(request: StreamRequest):
         messages.extend([msg.dict() for msg in request.messages])
         
         async def error_stream(error_msg: str):
+            if request.session_id:
+                yield f"data: {json.dumps({'session_id': request.session_id})}\n\n"
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
+            if request.session_id:
+                yield f"data: {json.dumps({'session_id': request.session_id})}\n\n"
             yield "data: [DONE]\n\n"
 
-        
         # Format the response
         return StreamingResponse(
             process_llm_stream(
                 messages=messages,
                 model=request.model,
                 api_key=request.api_key,
-                api_base_url=request.api_base_url
+                api_base_url=request.api_base_url,
+                session_id=request.session_id
             ),
             media_type="text/event-stream"
         )

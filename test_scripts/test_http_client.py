@@ -62,7 +62,8 @@ def stream_response(
             "messages": messages,
             "model": model,
             "api_key": api_key,
-            "api_base_url": api_base_url
+            "api_base_url": api_base_url,
+            "session_id": None  # Can be updated to use a real session ID if needed
         }
             
         print("\nSending request to server...")
@@ -136,36 +137,42 @@ def stream_response(
                             yield content
                             continue  # Continue to next chunk after handling content
                         
-                        # Handle tool call events
-                        elif "tool_call" in parsed:
-                            tool_call = parsed["tool_call"]
-                            print("\n\nTOOL CALL DETECTED")
-                            print(f"Tool: {tool_call.get('tool_name', 'Unknown tool')}")
+                        # Handle tool call in progress events
+                        elif "tool_call_in_progress" in parsed:
+                            tool_info = parsed
+                            tool_name = tool_info.get('tool_name', 'Unknown tool')
+                            tool_id = tool_info.get('tool_id', 'Unknown ID')
+                            print(f"\nTool call in progress: {tool_name} (ID: {tool_id})")
+                            continue  # Continue to next chunk
                             
-                            # Call the tool via the MCP API
-                            tool_name = tool_call.get('tool_name')
-                            arguments = tool_call.get('arguments', {})
-                            
-                            if tool_name:
-                                print(f"Calling tool: {tool_name}")
-                                try:
-                                    # Call the tool via the server API
-                                    tool_result = call_mcp_tool(tool_name, arguments)
-                                    
-                                    # Add the tool result to the conversation
-                                    result_message = f"Tool result: {tool_result}"
-                                    full_response += f"\n{result_message}"
-                                    yield f"\n\nTOOL RESULT: {tool_result}\n\n"
-                                except Exception as e:
-                                    print(f"Error calling tool: {str(e)}")
-                            continue  # Continue to next chunk after handling tool call
+                        # Handle tool execution notification
+                        elif "executing_tool" in parsed:
+                            tool_name = parsed["executing_tool"]
+                            print(f"\nExecuting tool: {tool_name}")
+                            continue  # Continue to next chunk
                         
                         # Handle tool result events
                         elif "tool_result" in parsed:
-                            tool_result = parsed["tool_result"]
-                            print(f"\n\nTOOL RESULT: {tool_result}\n\n")
-                            yield f"\n{tool_result}\n"
-                            continue  # Continue to next chunk after handling tool result
+                            result = parsed["tool_result"]
+                            tool_name = result.get('name', 'Unknown tool')
+                            is_success = result.get('success', False)
+                            result_text = result.get('result', 'No result')
+                            
+                            # Format for display
+                            if is_success:
+                                print(f"\n\nTOOL RESULT ({tool_name}):\n{result_text}\n")
+                            else:
+                                print(f"\n\nTOOL ERROR ({tool_name}):\n{result_text}\n")
+                                
+                            # Add to full response
+                            full_response += f"\n[Tool {tool_name} result: {result_text}]"
+                            yield f"\n\n[Tool Result: {result_text}]\n\n"
+                            continue  # Continue to next chunk
+                            
+                        # Handle continuation status
+                        elif "status" in parsed and parsed["status"] == "continuing_with_tool_result":
+                            print("\nContinuing with tool result...")
+                            continue  # Continue to next chunk
                         
                         # Handle session ID events - already handled above
                         elif "session_id" in parsed:
