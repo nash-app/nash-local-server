@@ -3,165 +3,138 @@ import json
 from app.llm_handler import configure_llm, stream_llm_response
 from app.mcp_handler import MCPHandler
 from app.prompts import get_system_prompt
+from app.streaming import StreamProcessor
 from test_scripts.api_credentials import get_api_credentials, print_credentials_info
-from test_scripts.tool_processor import process_tool_call
-from test_scripts.message_display import (
-    print_messages, print_user_prompt, print_assistant_header,
-    print_tool_header, print_tool_details
-)
+from test_scripts.message_display import print_messages, print_user_prompt, print_assistant_header
 
 
 async def chat():
     # Get API credentials from environment
     api_key, api_base_url, model = get_api_credentials()
-    
+
     # Configure LLM with credentials
     configure_llm(api_key=api_key, api_base_url=api_base_url, model=model)
-    
+
     # Print credentials info
     print_credentials_info(api_key, api_base_url, model)
-    
+
     messages = []
-    
+
     # Initialize MCP and get tool definitions
     mcp = MCPHandler.get_instance()
     await mcp.initialize()
-    tools = await mcp.list_tools()
+    tools = await mcp.list_tools_litellm()
 
-    system_prompt = get_system_prompt(tools)
+    system_prompt = get_system_prompt()
 
-    messages.append({
-        "role": "system",
-        "content": system_prompt
-    })
+    messages.append({"role": "system", "content": system_prompt})
 
     try:
         while True:
-            # Print current message history
-            
             # Get user input
             print_user_prompt()
             user_input = input("").strip()
-            if user_input.lower() in ['quit', 'exit', 'bye']:
+            if user_input.lower() in ["quit", "exit", "bye"]:
                 break
-            if user_input.lower() in ['messages']:
+            if user_input.lower() in ["messages"]:
                 print_messages(messages)
                 continue
-                
+
             # Add user message to history
-            messages.append({
-                "role": "user",
-                "content": user_input
-            })
+            messages.append({"role": "user", "content": user_input})
 
             while True:
                 # Stream AI response
                 print_assistant_header()
-                assistant_message = ""
-            
+
+                # Initialize the stream processor
+                processor = StreamProcessor()
+
+                # Process the streaming response
                 async for chunk in stream_llm_response(
-                    messages=messages,
-                    model=model,
-                    api_key=api_key,
-                    api_base_url=api_base_url
+                    messages=messages, model=model, api_key=api_key, api_base_url=api_base_url, tools=tools
                 ):
-                    # Process the raw LiteLLM chunk
-                    if hasattr(chunk, 'choices') and chunk.choices:
-                        # Extract the content from the choices
-                        delta = chunk.choices[0].delta
-                        if hasattr(delta, 'content') and delta.content:
-                            content = delta.content
-                            print(content, end="", flush=True)
-                            assistant_message += content
-            
-                # Add assistant response to history 
-                if assistant_message:
-                    # Add the original assistant message to the history first
-                    message = {
-                        "role": "assistant",
-                        "content": assistant_message
-                    }
+                    # Process each chunk and get displayable content and tool call data
+                    display_text, tool_call_data = processor.process_chunk(chunk)
+
+                    # Set up content/tool call tracking
+                    if not hasattr(processor, "_content_mode"):
+                        # First chunk, initialize tracking
+                        processor._content_mode = None
+                        processor._tool_call_in_progress = False
+                        processor._first_chunk = True
+                    
+                    # Only care about content vs tool call state
+                    if display_text:
+                        # This is a content chunk
+                        if processor._content_mode != "content":
+                            processor._content_mode = "content"
+                            print("\n[CONTENT] ", end="", flush=True)
+                        print(display_text, end="", flush=True)
+                    
+                    # If this is a tool call, let's show the details
+                    if tool_call_data:
+                        # Only print the tool call marker once when we first detect a tool call
+                        if not processor._tool_call_in_progress:
+                            processor._tool_call_in_progress = True
+                            processor._content_mode = "tool_call"
+                            print("\n[TOOL_CALL] ", end="", flush=True)
+                        
+                        # Stream tool call information
+                        for tc in tool_call_data:
+                            # Extract content to display
+                            if hasattr(tc, "function"):
+                                # Create a more compact display format
+                                parts = []
+                                if hasattr(tc.function, "name") and tc.function.name:
+                                    parts.append(tc.function.name)
+                                if hasattr(tc.function, "arguments") and tc.function.arguments:
+                                    args = tc.function.arguments.strip()
+                                    if args:
+                                        parts.append(args)
+                                
+                                # If we have parts to display, print them
+                                if parts:
+                                    print(f"{' '.join(parts)} ", end="", flush=True)
+
+                # Get the message to add to history
+                message = processor.get_message_for_history()
+
+                # Add the message if we have one
+                if message:
                     messages.append(message)
 
-                    # Process any tool calls in the message
-                    tool_call_result = await process_tool_call(assistant_message + "</tool_call>", mcp)
-                    if tool_call_result['tool_call_made']:
-                        message['content'] += "</tool_call></tool_call></tool_call></tool_call></tool_call></tool_call>"  # persist the end tag in the assistant message because the termination string isn't included and this is a case where the termination string was hit
-                        print("TOOL CALL --------------------------------------------------------")
-                        print(tool_call_result['formatted_result'])
-                        print("END CALL --------------------------------------------------------")
-                        # message['content'] += f"\n{tool_call_result['formatted_result']}"
-                        messages.append({
-                            "role": "assistant",
-                            "content": f"Tool result: {tool_call_result['formatted_result']}",
-                        })
+                    # If a tool call was detected, execute it
+                    if processor.is_tool_call_detected():
+                        print("\nEXECUTING TOOL CALL:")
+                        print(f"Tool: {processor.tool_use_info['name']}")
+                        print(f"Arguments: {json.dumps(processor.tool_use_info['input'], indent=2)}")
+
+                        # Execute the tool and get the result
+                        tool_result = await processor.execute_tool(mcp)
+
+                        # Print the result
+                        print("TOOL RESULT --------------------------------------------------------")
+                        print(tool_result["result_text"])
+                        print("END RESULT --------------------------------------------------------")
+
+                        # Add the result message to history if successful
+                        if tool_result["success"] and tool_result["result_message"]:
+                            messages.append(tool_result["result_message"])
                     else:
+                        # No tool call, just break out of the loop for next user input
                         break
-                    
-                    #if tool_call_result['tool_call_made']:
-                    #    # Print tool call details
-                    #    print_tool_header()
-                    #    print_tool_details(
-                    #        tool_call_result['tool_name'],
-                    #        tool_call_result['arguments'],
-                    #        tool_call_result['result']
-                    #    )
-                    #    
-                    #    # Add the tool result as a system message
-                    #    messages.append({
-                    #        "role": "system", 
-                    #        "content": tool_call_result['formatted_result']
-                    #    })
-                    #    
-                    #    # Add a system message instructing the assistant to continue solving the problem
-                    #    messages.append({
-                    #        "role": "system", 
-                    #        "content": "Continue solving the user's request autonomously based on these tool results. If the results indicate an error or unexpected outcome, fix your approach and try again."
-                    #    })
-                    #    
-                    #    # Get LLM's response to the tool result
-                    #    print_assistant_header(responding_to_tool=True)
-                    #    assistant_response = ""
-                    #    async for chunk in stream_llm_response(
-                    #        messages=messages,
-                    #        model=model,
-                    #        api_key=api_key,
-                    #        api_base_url=api_base_url
-                    #    ):
-                    #        # Process the raw LiteLLM chunk
-                    #        if hasattr(chunk, 'choices') and chunk.choices:
-                    #            # Extract the content from the choices
-                    #            delta = chunk.choices[0].delta
-                    #            if hasattr(delta, 'content') and delta.content:
-                    #                content = delta.content
-                    #                # Skip printing if assistant is repeating function results
-                    #                skip_print = False
-                    #                if content.strip().startswith("<tool_results>"):
-                    #                    skip_print = True
-                    #                    
-                    #                if not skip_print:
-                    #                    print(content, end="", flush=True)
-                    #                assistant_response += content
-                    #    
-                    #    # Add the tool response to message history
-                    #    if assistant_response:
-                    #        # Update the assistant's response in the message history
-                    #        messages.append({
-                    #            "role": "assistant", 
-                    #            "content": assistant_response
-                    #        })
-                    #elif 'error' in tool_call_result:
-                    #    # There was an error processing the tool call
-                    #    print(f"\nError: {tool_call_result['error']}")
                 else:
+                    # No message to add
+                    print("No valid assistant message or tool use detected.")
                     break
-            
+
     except Exception as e:
         print(f"\nError during chat: {e}")
     finally:
         # Clean up MCP
         await mcp.close()
-    
+
     print("\nChat ended.")
 
 
