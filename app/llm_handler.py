@@ -46,7 +46,7 @@ async def stream_llm_response(
 
         # Create the response stream with stop sequence
         response = await litellm.acompletion(
-            model=model, messages=messages, stream=True, temperature=0.3, extra_headers=litellm.headers, tools=tools
+            model=model, messages=messages, stream=True, temperature=0.7, extra_headers=litellm.headers, tools=tools
         )
 
         # Simply yield each chunk directly
