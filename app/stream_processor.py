@@ -21,9 +21,9 @@ class StreamProcessor:
         self.is_streaming = True
 
         streamable_content = {
-            "content": "",
-            "tool_name": "",
-            "tool_args": "",
+            "content": None,
+            "tool_name": None,
+            "tool_args": None,
         }
 
         if not hasattr(chunk, "choices") and not chunk.choices:
@@ -35,7 +35,7 @@ class StreamProcessor:
 
             if hasattr(choice.delta, "content") and choice.delta.content:
                 self.content += choice.delta.content
-                streamable_content["content"] = self.content
+                streamable_content["content"] = choice.delta.content
 
             if hasattr(choice.delta, "tool_calls") and choice.delta.tool_calls:
                 for tool_call in choice.delta.tool_calls:
