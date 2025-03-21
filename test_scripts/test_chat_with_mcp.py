@@ -102,7 +102,7 @@ async def chat():
                 messages.append(assistant_message)
                 if processor.tool_calls:
                     messages_for_tool_call_results = await processor.execute_tool_calls_and_get_user_message()
-                    messages.extend(messages_for_tool_call_results)
+                    messages.append(messages_for_tool_call_results[0])  # TODO: Handle multiple tool call results
                 else:
                     break
 

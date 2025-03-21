@@ -116,7 +116,7 @@ class StreamProcessor:
                 "role": "tool",
                 "tool_call_id": tool_call["id"],
                 "name": tool_call["function"]["name"],
-                "result": result.content[0].text,  # TODO: Handle multiple results and different content types
+                "content": result.content[0].text,  # TODO: Handle multiple results and different content types
                 "is_error": result.isError
             })
 
