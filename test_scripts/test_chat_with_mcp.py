@@ -3,7 +3,7 @@ import json
 from app.llm_handler import configure_llm, stream_llm_response
 from app.mcp_handler import MCPHandler
 from app.prompts import get_system_prompt
-from app.streaming import StreamProcessor
+from app.stream_processor import StreamProcessor
 from test_scripts.api_credentials import get_api_credentials, print_credentials_info
 from test_scripts.message_display import print_messages, print_user_prompt, print_assistant_header
 

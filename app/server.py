@@ -8,7 +8,7 @@ import json
 from .llm_handler import stream_llm_response
 from .mcp_handler import MCPHandler
 from .prompts import get_system_prompt
-from .streaming import StreamProcessor
+from .stream_processor import StreamProcessor
 
 
 app = FastAPI(title="Nash LLM Server")

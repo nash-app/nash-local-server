@@ -232,3 +232,11 @@ The server supports multiple LLM providers through their respective base URLs:
    - Use appropriate base URL for your provider
 
 See `client_example.py` for a complete implementation.
+
+## Tests
+
+Run tests with `pytest`
+
+```bash
+$ pytest tests
+```
