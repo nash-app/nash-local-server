@@ -36,7 +36,7 @@ def test_process_chunk_single_tool_call():
 
 def test_process_chunk_only_assistant():
     processor = StreamProcessor()
-    
+
     # Load the fixture with tool calls
     chunks = load_fixture("anthropic_llm_chunks_only_assistant_01.json")
 

@@ -98,7 +98,7 @@ async def process_llm_stream(
     # Continue the conversation until no more tool calls
     while True:
         # Reset the processor for this iteration
-        processor = StreamProcessor()
+        processor = StreamProcessor(mcp)
 
         try:
             # Stream the LLM response
@@ -120,15 +120,17 @@ async def process_llm_stream(
             new_messages_from_stream.append(assistant_message)
             if processor.tool_calls:
                 messages_for_tool_call_results = await processor.execute_tool_calls_and_get_user_message()
-                conversation_messages.append(messages_for_tool_call_results[0])  # TODO: Handle multiple tool call results
+                conversation_messages.append(
+                    messages_for_tool_call_results[0]
+                )  # TODO: Handle multiple tool call results
                 new_messages_from_stream.append(messages_for_tool_call_results[0])
                 message_for_client = {
                     "type": "tool_result",
                     "content": None,
                     "tool_name": None,
                     "tool_args": None,
-                    "tool_result": messages_for_tool_call_results[0]['content'],
-                    "new_raw_llm_messages": []
+                    "tool_result": messages_for_tool_call_results[0]["content"],
+                    "new_raw_llm_messages": [],
                 }
                 yield f"data: {json.dumps(message_for_client)}\n\n"
             else:
@@ -138,7 +140,7 @@ async def process_llm_stream(
                     "tool_name": None,
                     "tool_args": None,
                     "tool_result": None,
-                    "new_raw_llm_messages": new_messages_from_stream
+                    "new_raw_llm_messages": new_messages_from_stream,
                 }
                 yield f"data: {json.dumps(message_for_client)}\n\n"
                 break

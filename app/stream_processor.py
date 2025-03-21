@@ -89,15 +89,15 @@ class StreamProcessor:
         # }
         if not self.tool_calls:
             return {
-                'content': self.content,
-                'role': 'assistant',
+                "content": self.content,
+                "role": "assistant",
             }
         # Tool calls are present, so we need to return a message with tool calls
         assistant_message = {
-            'content': self.content,
-            'role': 'assistant',
-            'tool_calls': copy.deepcopy(self.tool_calls),
-            'function_call': None
+            "content": self.content,
+            "role": "assistant",
+            "tool_calls": copy.deepcopy(self.tool_calls),
+            "function_call": None,
         }
         # We need to stringify the arguments of the tool calls now
         for tool_call in assistant_message["tool_calls"]:
@@ -111,13 +111,17 @@ class StreamProcessor:
         messages = []
         # Execute the tool calls
         for tool_call in self.tool_calls:
-            result = await self.mcp.call_tool(tool_call["function"]["name"], arguments=tool_call["function"]["arguments"])
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call["id"],
-                "name": tool_call["function"]["name"],
-                "content": result.content[0].text,  # TODO: Handle multiple results and different content types
-                "is_error": result.isError
-            })
+            result = await self.mcp.call_tool(
+                tool_call["function"]["name"], arguments=tool_call["function"]["arguments"]
+            )
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call["id"],
+                    "name": tool_call["function"]["name"],
+                    "content": result.content[0].text,  # TODO: Handle multiple results and different content types
+                    "is_error": result.isError,
+                }
+            )
 
         return messages
