@@ -1,3 +1,4 @@
+import copy
 import json
 
 
@@ -86,7 +87,37 @@ class StreamProcessor:
         #     ],
         #     'function_call': None
         # }
-        pass
+        if not self.tool_calls:
+            return {
+                'content': self.content,
+                'role': 'assistant',
+            }
+        # Tool calls are present, so we need to return a message with tool calls
+        assistant_message = {
+            'content': self.content,
+            'role': 'assistant',
+            'tool_calls': copy.deepcopy(self.tool_calls),
+            'function_call': None
+        }
+        # We need to stringify the arguments of the tool calls now
+        for tool_call in assistant_message["tool_calls"]:
+            tool_call["function"]["arguments"] = json.dumps(tool_call["function"]["arguments"])
+        return assistant_message
 
-    def execute_tool_calls_and_get_user_message(self):
-        pass
+    async def execute_tool_calls_and_get_user_message(self):
+        if not self.tool_calls:
+            return []
+
+        messages = []
+        # Execute the tool calls
+        for tool_call in self.tool_calls:
+            result = await self.mcp.call_tool(tool_call["function"]["name"], arguments=tool_call["function"]["arguments"])
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call["id"],
+                "name": tool_call["function"]["name"],
+                "result": result.content[0].text,  # TODO: Handle multiple results and different content types
+                "is_error": result.isError
+            })
+
+        return messages
