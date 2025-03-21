@@ -126,6 +126,7 @@ class HttpClient:
                                 if event["tool_result"]:
                                     print(f"\n[TOOL_RESULT] {event['tool_result']}")
 
+                            elif event_type == "new_raw_llm_messages":
                                 # Add new messages to our history
                                 if event.get("new_raw_llm_messages"):
                                     for msg in event["new_raw_llm_messages"]:

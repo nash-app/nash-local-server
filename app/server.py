@@ -135,7 +135,7 @@ async def process_llm_stream(
                 yield f"data: {json.dumps(message_for_client)}\n\n"
             else:
                 message_for_client = {
-                    "type": "tool_result",
+                    "type": "new_raw_llm_messages",
                     "content": None,
                     "tool_name": None,
                     "tool_args": None,
