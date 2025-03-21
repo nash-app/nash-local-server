@@ -1,0 +1,373 @@
+[
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518542,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "I'll help you list",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518542,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": " the files on your desktop. Let me ",
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518542,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "do that for you.",
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": "toolu_01Ju5MyENhhuR13wfwW226VY",
+              "function": {
+                "arguments": "",
+                "name": "execute_command"
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "{\"",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "cm",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "d\": ",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "\"ls ",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "-la ~/De",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "sktop\"}",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-e19171e3-2c11-426a-adfe-144fb4af8d45",
+    "created": 1742518543,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": "tool_calls",
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": null,
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  }
+]

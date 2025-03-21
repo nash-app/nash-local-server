@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,7 +8,7 @@ import json
 from .llm_handler import stream_llm_response
 from .mcp_handler import MCPHandler
 from .prompts import get_system_prompt
-from .streaming import StreamProcessor
+from .stream_processor import StreamProcessor
 
 
 app = FastAPI(title="Nash LLM Server")
@@ -23,17 +23,10 @@ app.add_middleware(
 )
 
 
-class Message(BaseModel):
-    """A message in the conversation."""
-
-    role: str = Field(..., description="The role of the message sender (user/assistant/system)")
-    content: str = Field(..., description="The content of the message")
-
-
 class BaseRequest(BaseModel):
     """Base request model with common fields."""
 
-    messages: List[Message] = Field(..., description="List of messages in the conversation")
+    messages: List[dict] = Field(..., description="List of messages in the conversation")
     api_key: str = Field(..., description="API key to use for the request")
     api_base_url: str = Field(..., description="API base URL to use for the request")
 
@@ -42,7 +35,6 @@ class StreamRequest(BaseRequest):
     """Request model for streaming completions."""
 
     model: str = Field(..., description="Model to use for completion")
-    session_id: Optional[str] = Field(None, description="Session ID to use for the request")
 
 
 @app.on_event("startup")
@@ -73,7 +65,6 @@ async def process_llm_stream(
     model: str,
     api_key: str,
     api_base_url: str,
-    session_id: Optional[str] = None,
 ):
     """
     Format LLM responses into proper SSE format, handling tool calls on the server.
@@ -86,24 +77,22 @@ async def process_llm_stream(
     5. Continues the conversation
     6. Streams everything to the client
     """
+
     # Initialize the stream processor
     processor = StreamProcessor()
     mcp = MCPHandler.get_instance()
-
-    # Start by sending session ID if provided
-    if session_id:
-        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
 
     # Get available tools asynchronously
     tools = await mcp.list_tools_litellm()
 
     # Keep track of the conversation
     conversation_messages = messages.copy()
+    new_messages_from_stream = []
 
     # Continue the conversation until no more tool calls
     while True:
         # Reset the processor for this iteration
-        processor = StreamProcessor()
+        processor = StreamProcessor(mcp)
 
         try:
             # Stream the LLM response
@@ -111,76 +100,44 @@ async def process_llm_stream(
                 messages=conversation_messages, model=model, api_key=api_key, api_base_url=api_base_url, tools=tools
             ):
                 # Process each chunk with the stream processor
-                display_text, tool_call_data = processor.process_chunk(chunk)
+                streamable_content = processor.process_chunk(chunk)
 
-                # If there's text to display, send it as an SSE event
-                if display_text:
-                    yield f"data: {json.dumps({'content': display_text})}\n\n"
-                
-                # If there's tool call data, send it to the client
-                if tool_call_data:
-                    # Convert tool call data to a serializable form
-                    serializable_tool_calls = []
-                    for tool_call in tool_call_data:
-                        tool_call_dict = {}
-                        if hasattr(tool_call, "id"):
-                            tool_call_dict["id"] = tool_call.id
-                        if hasattr(tool_call, "function"):
-                            tool_call_dict["function"] = {}
-                            if hasattr(tool_call.function, "name"):
-                                tool_call_dict["function"]["name"] = tool_call.function.name
-                            if hasattr(tool_call.function, "arguments"):
-                                tool_call_dict["function"]["arguments"] = tool_call.function.arguments
-                        serializable_tool_calls.append(tool_call_dict)
-                    
-                    yield f"data: {json.dumps({'tool_calls': serializable_tool_calls})}\n\n"
+                # Augment the streamable content with http client specific attributes
+                streamable_content["type"] = "stream"
+                streamable_content["tool_result"] = None
+                streamable_content["new_raw_llm_messages"] = []
 
-                # If we're processing a tool call, send a notification
-                if processor.collecting_tool_call:
-                    # Send a special event to indicate a tool call is in progress
-                    tool_status = {"tool_call_in_progress": True}
-                    if processor.tool_name:
-                        tool_status["tool_name"] = processor.tool_name
-                    if processor.tool_call_id:
-                        tool_status["tool_id"] = processor.tool_call_id
+                yield f"data: {json.dumps(streamable_content)}\n\n"
 
-                    yield f"data: {json.dumps(tool_status)}\n\n"
-
-            # Get the assistant's message to add to the conversation
-            assistant_message = processor.get_message_for_history()
-            if assistant_message:
-                conversation_messages.append(assistant_message)
-
-            # If a tool call was detected, execute it and continue the conversation
-            if processor.is_tool_call_detected():
-                # Send notification that we're executing a tool
-                yield f"data: {json.dumps({'executing_tool': processor.tool_use_info['name']})}\n\n"
-
-                # Execute the tool and get the result
-                tool_result = await processor.execute_tool(mcp)
-
-                # Send the tool result to the client
-                tool_result_data = {
-                    "tool_result": {
-                        "name": processor.tool_use_info["name"],
-                        "success": tool_result["success"],
-                        "result": tool_result["result_text"],
-                    }
+            assistant_message = processor.get_assistant_message()
+            conversation_messages.append(assistant_message)
+            new_messages_from_stream.append(assistant_message)
+            if processor.tool_calls:
+                messages_for_tool_call_results = await processor.execute_tool_calls_and_get_user_message()
+                conversation_messages.append(
+                    messages_for_tool_call_results[0]
+                )  # TODO: Handle multiple tool call results
+                new_messages_from_stream.append(messages_for_tool_call_results[0])
+                message_for_client = {
+                    "type": "tool_result",
+                    "content": None,
+                    "tool_name": None,
+                    "tool_args": None,
+                    "tool_result": messages_for_tool_call_results[0]["content"],
+                    "new_raw_llm_messages": [],
                 }
-                yield f"data: {json.dumps(tool_result_data)}\n\n"
-
-                # Add the tool result to the conversation
-                if tool_result["success"] and tool_result["result_message"]:
-                    conversation_messages.append(tool_result["result_message"])
-
-                    # Yield a separator to indicate we're continuing with the LLM
-                    yield f"data: {json.dumps({'status': 'continuing_with_tool_result'})}\n\n"
-
-                    # Continue the loop - we'll get another response from the LLM
-                    continue
-
-            # If we got here, there were no tool calls or we've completed all tool calls
-            break
+                yield f"data: {json.dumps(message_for_client)}\n\n"
+            else:
+                message_for_client = {
+                    "type": "new_raw_llm_messages",
+                    "content": None,
+                    "tool_name": None,
+                    "tool_args": None,
+                    "tool_result": None,
+                    "new_raw_llm_messages": new_messages_from_stream,
+                }
+                yield f"data: {json.dumps(message_for_client)}\n\n"
+                break
 
         except Exception as e:
             # Handle errors in streaming
@@ -189,10 +146,6 @@ async def process_llm_stream(
             print(f"Error in stream_llm_response: {error_message}")
             break
 
-    # Send session ID again at the end if provided
-    if session_id:
-        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
-
     # End of stream marker
     yield "data: [DONE]\n\n"
 
@@ -200,17 +153,13 @@ async def process_llm_stream(
 @app.post("/v1/chat/completions/stream")
 async def stream_completion(request: StreamRequest):
     """Stream chat completions with user-provided credentials."""
+    async def error_stream(error_msg: str):
+        yield f"data: {json.dumps({'error': error_msg})}\n\n"
+        yield "data: [DONE]\n\n"
+
     try:
         messages = [{"role": "system", "content": app.state.system_prompt}]
-        messages.extend([msg.dict() for msg in request.messages])
-
-        async def error_stream(error_msg: str):
-            if request.session_id:
-                yield f"data: {json.dumps({'session_id': request.session_id})}\n\n"
-            yield f"data: {json.dumps({'error': error_msg})}\n\n"
-            if request.session_id:
-                yield f"data: {json.dumps({'session_id': request.session_id})}\n\n"
-            yield "data: [DONE]\n\n"
+        messages.extend(request.messages)
 
         # Format the response
         return StreamingResponse(
@@ -219,10 +168,9 @@ async def stream_completion(request: StreamRequest):
                 model=request.model,
                 api_key=request.api_key,
                 api_base_url=request.api_base_url,
-                session_id=request.session_id,
             ),
             media_type="text/event-stream",
-            headers={"Access-Control-Allow-Origin": "*"}
+            headers={"Access-Control-Allow-Origin": "*"},
         )
     except Exception as e:
         return StreamingResponse(error_stream(str(e)), media_type="text/event-stream", status_code=500)

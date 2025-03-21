@@ -1,9 +1,8 @@
 import asyncio
-import json
 from app.llm_handler import configure_llm, stream_llm_response
 from app.mcp_handler import MCPHandler
 from app.prompts import get_system_prompt
-from app.streaming import StreamProcessor
+from app.stream_processor import StreamProcessor
 from test_scripts.api_credentials import get_api_credentials, print_credentials_info
 from test_scripts.message_display import print_messages, print_user_prompt, print_assistant_header
 
@@ -31,6 +30,11 @@ async def chat():
 
     try:
         while True:
+            print("Messages")
+            import pprint
+
+            pprint.pprint(messages[1:])
+            print()
             # Get user input
             print_user_prompt()
             user_input = input("").strip()
@@ -48,85 +52,63 @@ async def chat():
                 print_assistant_header()
 
                 # Initialize the stream processor
-                processor = StreamProcessor()
+                processor = StreamProcessor(mcp)
+
+                # Handle state for what part of the stream we're in
+                in_content_stream = False
+                in_tool_name_stream = False
+                in_tool_args_stream = False
 
                 # Process the streaming response
                 async for chunk in stream_llm_response(
                     messages=messages, model=model, api_key=api_key, api_base_url=api_base_url, tools=tools
                 ):
                     # Process each chunk and get displayable content and tool call data
-                    display_text, tool_call_data = processor.process_chunk(chunk)
+                    streamable_content = processor.process_chunk(chunk)
 
-                    # Set up content/tool call tracking
-                    if not hasattr(processor, "_content_mode"):
-                        # First chunk, initialize tracking
-                        processor._content_mode = None
-                        processor._tool_call_in_progress = False
-                        processor._first_chunk = True
-                    
-                    # Only care about content vs tool call state
-                    if display_text:
-                        # This is a content chunk
-                        if processor._content_mode != "content":
-                            processor._content_mode = "content"
-                            print("\n[CONTENT] ", end="", flush=True)
-                        print(display_text, end="", flush=True)
-                    
-                    # If this is a tool call, let's show the details
-                    if tool_call_data:
-                        # Only print the tool call marker once when we first detect a tool call
-                        if not processor._tool_call_in_progress:
-                            processor._tool_call_in_progress = True
-                            processor._content_mode = "tool_call"
-                            print("\n[TOOL_CALL] ", end="", flush=True)
-                        
-                        # Stream tool call information
-                        for tc in tool_call_data:
-                            # Extract content to display
-                            if hasattr(tc, "function"):
-                                # Create a more compact display format
-                                parts = []
-                                if hasattr(tc.function, "name") and tc.function.name:
-                                    parts.append(tc.function.name)
-                                if hasattr(tc.function, "arguments") and tc.function.arguments:
-                                    args = tc.function.arguments.strip()
-                                    if args:
-                                        parts.append(args)
-                                
-                                # If we have parts to display, print them
-                                if parts:
-                                    print(f"{' '.join(parts)} ", end="", flush=True)
+                    # Handle content stream
+                    if streamable_content["content"]:
+                        # Flip these bits if we were previously in a tool name or tool args stream
+                        if in_tool_name_stream or in_tool_args_stream:
+                            in_tool_name_stream = False
+                            in_tool_args_stream = False
 
-                # Get the message to add to history
-                message = processor.get_message_for_history()
+                        if not in_content_stream:
+                            print("\n[CONTENT]")
+                            in_content_stream = True
 
-                # Add the message if we have one
-                if message:
-                    messages.append(message)
+                        print(streamable_content["content"], end="", flush=True)
 
-                    # If a tool call was detected, execute it
-                    if processor.is_tool_call_detected():
-                        print("\nEXECUTING TOOL CALL:")
-                        print(f"Tool: {processor.tool_use_info['name']}")
-                        print(f"Arguments: {json.dumps(processor.tool_use_info['input'], indent=2)}")
+                    # Handle tool name stream
+                    if streamable_content["tool_name"]:
+                        if in_content_stream or in_tool_args_stream:
+                            in_content_stream = False
+                            in_tool_args_stream = False
 
-                        # Execute the tool and get the result
-                        tool_result = await processor.execute_tool(mcp)
+                        if not in_tool_name_stream:
+                            print("\n[TOOL_NAME]")
+                            in_tool_name_stream = True
 
-                        # Print the result
-                        print("TOOL RESULT --------------------------------------------------------")
-                        print(tool_result["result_text"])
-                        print("END RESULT --------------------------------------------------------")
+                        print(streamable_content["tool_name"], end="", flush=True)
 
-                        # Add the result message to history if successful
-                        if tool_result["success"] and tool_result["result_message"]:
-                            messages.append(tool_result["result_message"])
-                    else:
-                        # No tool call, just break out of the loop for next user input
-                        break
+                    # Handle tool args stream
+                    if streamable_content["tool_args"]:
+                        if in_content_stream or in_tool_name_stream:
+                            in_content_stream = False
+                            in_tool_name_stream = False
+
+                        if not in_tool_args_stream:
+                            print("\n[TOOL_ARGS]")
+                            in_tool_args_stream = True
+
+                        print(streamable_content["tool_args"], end="", flush=True)
+
+                assistant_message = processor.get_assistant_message()
+                messages.append(assistant_message)
+                if processor.tool_calls:
+                    messages_for_tool_call_results = await processor.execute_tool_calls_and_get_user_message()
+                    messages.append(messages_for_tool_call_results[0])  # TODO: Handle multiple tool call results
                 else:
-                    # No message to add
-                    print("No valid assistant message or tool use detected.")
                     break
 
     except Exception as e:
