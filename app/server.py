@@ -99,6 +99,7 @@ async def process_llm_stream(
 
     # Keep track of the conversation
     conversation_messages = messages.copy()
+    new_messages_from_stream = []
 
     # Continue the conversation until no more tool calls
     while True:
@@ -111,76 +112,42 @@ async def process_llm_stream(
                 messages=conversation_messages, model=model, api_key=api_key, api_base_url=api_base_url, tools=tools
             ):
                 # Process each chunk with the stream processor
-                display_text, tool_call_data = processor.process_chunk(chunk)
+                streamable_content = processor.process_chunk(chunk)
 
-                # If there's text to display, send it as an SSE event
-                if display_text:
-                    yield f"data: {json.dumps({'content': display_text})}\n\n"
+                # Augment the streamable content with http client specific attributes
+                streamable_content["type"] = "stream"
+                streamable_content["tool_result"] = None
+                streamable_content["new_raw_llm_messages"] = []
 
-                # If there's tool call data, send it to the client
-                if tool_call_data:
-                    # Convert tool call data to a serializable form
-                    serializable_tool_calls = []
-                    for tool_call in tool_call_data:
-                        tool_call_dict = {}
-                        if hasattr(tool_call, "id"):
-                            tool_call_dict["id"] = tool_call.id
-                        if hasattr(tool_call, "function"):
-                            tool_call_dict["function"] = {}
-                            if hasattr(tool_call.function, "name"):
-                                tool_call_dict["function"]["name"] = tool_call.function.name
-                            if hasattr(tool_call.function, "arguments"):
-                                tool_call_dict["function"]["arguments"] = tool_call.function.arguments
-                        serializable_tool_calls.append(tool_call_dict)
+                yield f"data: {json.dumps(streamable_content)}\n\n"
 
-                    yield f"data: {json.dumps({'tool_calls': serializable_tool_calls})}\n\n"
-
-                # If we're processing a tool call, send a notification
-                if processor.collecting_tool_call:
-                    # Send a special event to indicate a tool call is in progress
-                    tool_status = {"tool_call_in_progress": True}
-                    if processor.tool_name:
-                        tool_status["tool_name"] = processor.tool_name
-                    if processor.tool_call_id:
-                        tool_status["tool_id"] = processor.tool_call_id
-
-                    yield f"data: {json.dumps(tool_status)}\n\n"
-
-            # Get the assistant's message to add to the conversation
-            assistant_message = processor.get_message_for_history()
-            if assistant_message:
-                conversation_messages.append(assistant_message)
-
-            # If a tool call was detected, execute it and continue the conversation
-            if processor.is_tool_call_detected():
-                # Send notification that we're executing a tool
-                yield f"data: {json.dumps({'executing_tool': processor.tool_use_info['name']})}\n\n"
-
-                # Execute the tool and get the result
-                tool_result = await processor.execute_tool(mcp)
-
-                # Send the tool result to the client
-                tool_result_data = {
-                    "tool_result": {
-                        "name": processor.tool_use_info["name"],
-                        "success": tool_result["success"],
-                        "result": tool_result["result_text"],
-                    }
+            assistant_message = processor.get_assistant_message()
+            conversation_messages.append(assistant_message)
+            new_messages_from_stream.append(assistant_message)
+            if processor.tool_calls:
+                messages_for_tool_call_results = await processor.execute_tool_calls_and_get_user_message()
+                conversation_messages.append(messages_for_tool_call_results[0])  # TODO: Handle multiple tool call results
+                new_messages_from_stream.append(messages_for_tool_call_results[0])
+                message_for_client = {
+                    "type": "tool_result",
+                    "content": None,
+                    "tool_name": None,
+                    "tool_args": None,
+                    "tool_result": messages_for_tool_call_results[0]['content'],
+                    "new_raw_llm_messages": []
                 }
-                yield f"data: {json.dumps(tool_result_data)}\n\n"
-
-                # Add the tool result to the conversation
-                if tool_result["success"] and tool_result["result_message"]:
-                    conversation_messages.append(tool_result["result_message"])
-
-                    # Yield a separator to indicate we're continuing with the LLM
-                    yield f"data: {json.dumps({'status': 'continuing_with_tool_result'})}\n\n"
-
-                    # Continue the loop - we'll get another response from the LLM
-                    continue
-
-            # If we got here, there were no tool calls or we've completed all tool calls
-            break
+                yield f"data: {json.dumps(message_for_client)}\n\n"
+            else:
+                message_for_client = {
+                    "type": "tool_result",
+                    "content": None,
+                    "tool_name": None,
+                    "tool_args": None,
+                    "tool_result": None,
+                    "new_raw_llm_messages": new_messages_from_stream
+                }
+                yield f"data: {json.dumps(message_for_client)}\n\n"
+                break
 
         except Exception as e:
             # Handle errors in streaming
