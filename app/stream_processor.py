@@ -69,6 +69,23 @@ class StreamProcessor:
         return streamable_content
 
     def get_assistant_message(self):
+        # Assistant message format with tool calls
+        # {
+        #     'content': 'content',
+        #     'role': 'assistant',
+        #     'tool_calls': [
+        #         {
+        #             'index': 1,
+        #             'function': {
+        #                 'arguments': '{"location": "Boston", "unit": "fahrenheit"}',
+        #                 'name': 'get_current_weather'
+        #             },
+        #            'id': 'toolu_01HxUDqLmTT23Tu1AQBSXXhg',
+        #            'type': 'function'
+        #         }
+        #     ],
+        #     'function_call': None
+        # }
         pass
 
     def execute_tool_calls_and_get_user_message(self):
