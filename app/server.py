@@ -116,7 +116,7 @@ async def process_llm_stream(
                 # If there's text to display, send it as an SSE event
                 if display_text:
                     yield f"data: {json.dumps({'content': display_text})}\n\n"
-                
+
                 # If there's tool call data, send it to the client
                 if tool_call_data:
                     # Convert tool call data to a serializable form
@@ -132,7 +132,7 @@ async def process_llm_stream(
                             if hasattr(tool_call.function, "arguments"):
                                 tool_call_dict["function"]["arguments"] = tool_call.function.arguments
                         serializable_tool_calls.append(tool_call_dict)
-                    
+
                     yield f"data: {json.dumps({'tool_calls': serializable_tool_calls})}\n\n"
 
                 # If we're processing a tool call, send a notification
@@ -222,7 +222,7 @@ async def stream_completion(request: StreamRequest):
                 session_id=request.session_id,
             ),
             media_type="text/event-stream",
-            headers={"Access-Control-Allow-Origin": "*"}
+            headers={"Access-Control-Allow-Origin": "*"},
         )
     except Exception as e:
         return StreamingResponse(error_stream(str(e)), media_type="text/event-stream", status_code=500)

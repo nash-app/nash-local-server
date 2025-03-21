@@ -63,7 +63,7 @@ async def chat():
                         processor._content_mode = None
                         processor._tool_call_in_progress = False
                         processor._first_chunk = True
-                    
+
                     # Only care about content vs tool call state
                     if display_text:
                         # This is a content chunk
@@ -71,7 +71,7 @@ async def chat():
                             processor._content_mode = "content"
                             print("\n[CONTENT] ", end="", flush=True)
                         print(display_text, end="", flush=True)
-                    
+
                     # If this is a tool call, let's show the details
                     if tool_call_data:
                         # Only print the tool call marker once when we first detect a tool call
@@ -79,7 +79,7 @@ async def chat():
                             processor._tool_call_in_progress = True
                             processor._content_mode = "tool_call"
                             print("\n[TOOL_CALL] ", end="", flush=True)
-                        
+
                         # Stream tool call information
                         for tc in tool_call_data:
                             # Extract content to display
@@ -92,7 +92,7 @@ async def chat():
                                     args = tc.function.arguments.strip()
                                     if args:
                                         parts.append(args)
-                                
+
                                 # If we have parts to display, print them
                                 if parts:
                                     print(f"{' '.join(parts)} ", end="", flush=True)

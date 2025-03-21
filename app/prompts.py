@@ -1,6 +1,7 @@
 # flake8: noqa: E501
 import datetime
 
+
 def get_system_prompt() -> str:
     current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
