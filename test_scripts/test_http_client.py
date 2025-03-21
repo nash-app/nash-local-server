@@ -20,11 +20,6 @@ class HttpClient:
         self.model = model
         self.messages = []
 
-        # Get the system prompt from the prompts module
-        from app.prompts import get_system_prompt
-
-        self.messages.append({"role": "system", "content": get_system_prompt()})
-
     async def stream_chat(self, user_message):
         """Send a message to the server and stream the response."""
         # Add user message to history
@@ -32,7 +27,7 @@ class HttpClient:
 
         # Prepare request payload
         payload = {
-            "messages": [{"role": msg["role"], "content": msg["content"]} for msg in self.messages],
+            "messages": self.messages,
             "model": self.model,
             "api_key": self.api_key,
             "api_base_url": self.api_base_url,

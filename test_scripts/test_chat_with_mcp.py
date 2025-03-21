@@ -30,6 +30,11 @@ async def chat():
 
     try:
         while True:
+            print("Messages")
+            import pprint
+
+            pprint.pprint(messages[1:])
+            print()
             # Get user input
             print_user_prompt()
             user_input = input("").strip()

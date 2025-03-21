@@ -23,17 +23,10 @@ app.add_middleware(
 )
 
 
-class Message(BaseModel):
-    """A message in the conversation."""
-
-    role: str = Field(..., description="The role of the message sender (user/assistant/system)")
-    content: str = Field(..., description="The content of the message")
-
-
 class BaseRequest(BaseModel):
     """Base request model with common fields."""
 
-    messages: List[Message] = Field(..., description="List of messages in the conversation")
+    messages: List[dict] = Field(..., description="List of messages in the conversation")
     api_key: str = Field(..., description="API key to use for the request")
     api_base_url: str = Field(..., description="API base URL to use for the request")
 
@@ -84,6 +77,7 @@ async def process_llm_stream(
     5. Continues the conversation
     6. Streams everything to the client
     """
+
     # Initialize the stream processor
     processor = StreamProcessor()
     mcp = MCPHandler.get_instance()
@@ -159,13 +153,13 @@ async def process_llm_stream(
 @app.post("/v1/chat/completions/stream")
 async def stream_completion(request: StreamRequest):
     """Stream chat completions with user-provided credentials."""
+    async def error_stream(error_msg: str):
+        yield f"data: {json.dumps({'error': error_msg})}\n\n"
+        yield "data: [DONE]\n\n"
+
     try:
         messages = [{"role": "system", "content": app.state.system_prompt}]
-        messages.extend([msg.dict() for msg in request.messages])
-
-        async def error_stream(error_msg: str):
-            yield f"data: {json.dumps({'error': error_msg})}\n\n"
-            yield "data: [DONE]\n\n"
+        messages.extend(request.messages)
 
         # Format the response
         return StreamingResponse(
