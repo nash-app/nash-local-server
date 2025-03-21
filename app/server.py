@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,7 +42,6 @@ class StreamRequest(BaseRequest):
     """Request model for streaming completions."""
 
     model: str = Field(..., description="Model to use for completion")
-    session_id: Optional[str] = Field(None, description="Session ID to use for the request")
 
 
 @app.on_event("startup")
@@ -73,7 +72,6 @@ async def process_llm_stream(
     model: str,
     api_key: str,
     api_base_url: str,
-    session_id: Optional[str] = None,
 ):
     """
     Format LLM responses into proper SSE format, handling tool calls on the server.
@@ -89,10 +87,6 @@ async def process_llm_stream(
     # Initialize the stream processor
     processor = StreamProcessor()
     mcp = MCPHandler.get_instance()
-
-    # Start by sending session ID if provided
-    if session_id:
-        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
 
     # Get available tools asynchronously
     tools = await mcp.list_tools_litellm()
@@ -156,10 +150,6 @@ async def process_llm_stream(
             print(f"Error in stream_llm_response: {error_message}")
             break
 
-    # Send session ID again at the end if provided
-    if session_id:
-        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
-
     # End of stream marker
     yield "data: [DONE]\n\n"
 
@@ -172,11 +162,7 @@ async def stream_completion(request: StreamRequest):
         messages.extend([msg.dict() for msg in request.messages])
 
         async def error_stream(error_msg: str):
-            if request.session_id:
-                yield f"data: {json.dumps({'session_id': request.session_id})}\n\n"
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
-            if request.session_id:
-                yield f"data: {json.dumps({'session_id': request.session_id})}\n\n"
             yield "data: [DONE]\n\n"
 
         # Format the response
@@ -186,7 +172,6 @@ async def stream_completion(request: StreamRequest):
                 model=request.model,
                 api_key=request.api_key,
                 api_base_url=request.api_base_url,
-                session_id=request.session_id,
             ),
             media_type="text/event-stream",
             headers={"Access-Control-Allow-Origin": "*"},
