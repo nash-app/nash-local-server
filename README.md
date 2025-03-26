@@ -20,19 +20,20 @@ poetry run python test_scripts/test_llm_handler.py
 
 The test script provides an interactive CLI that allows you to:
 
-- Choose between OpenAI and Anthropic providers
+- Use Anthropic's powerful language models
 - Select from available models:
-  - OpenAI: gpt-4-turbo, gpt-4-0125-preview, gpt-4, gpt-3.5-turbo
-  - Anthropic: claude-3-opus/sonnet/haiku, claude-2.1
+  - claude-3-opus
+  - claude-3-sonnet
+  - claude-3-haiku
+  - claude-2.1
 - Test conversation summarization
 - View session IDs and token usage
 
 ### Environment Setup for Testing
 
-Create a `.env` file with your API keys:
+Create a `.env` file with your API key:
 
 ```bash
-OPENAI_API_KEY=sk-...      # Required for OpenAI models
 ANTHROPIC_API_KEY=sk-...   # Required for Anthropic models
 ```
 
@@ -82,9 +83,9 @@ Stream chat completions from the LLM with server-sent events.
       "content": "Hello, how are you?"
     }
   ],
-  "model": "gpt-4-turbo-preview", // Required
+  "model": "claude-3-sonnet", // Required
   "api_key": "sk-...", // Required
-  "api_base_url": "https://api.openai.com/v1", // Required
+  "api_base_url": "https://api.anthropic.com", // Required
   "session_id": "optional-uuid" // Optional
 }
 ```
@@ -118,9 +119,9 @@ Summarize a conversation to reduce token count while preserving context.
       "content": "I'm doing well, thank you!"
     }
   ],
-  "model": "gpt-4-turbo-preview", // Required
+  "model": "claude-3-sonnet", // Required
   "api_key": "sk-...", // Required
-  "api_base_url": "https://api.openai.com/v1", // Required
+  "api_base_url": "https://api.anthropic.com", // Required
   "session_id": "optional-uuid" // Optional
 }
 ```
@@ -208,9 +209,8 @@ or for 400 errors:
 
 ## Provider Support
 
-The server supports multiple LLM providers through their respective base URLs:
+The server supports Anthropic's language models through their API:
 
-- OpenAI: `https://api.openai.com/v1`
 - Anthropic: `https://api.anthropic.com`
 
 ## Client Implementation Tips
@@ -229,7 +229,7 @@ The server supports multiple LLM providers through their respective base URLs:
 
 3. **API Configuration**
    - Always provide model, api_key, and api_base_url
-   - Use appropriate base URL for your provider
+   - Use Anthropic's base URL: https://api.anthropic.com
 
 See `client_example.py` for a complete implementation.
 
