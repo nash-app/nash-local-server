@@ -1,0 +1,101 @@
+[
+  {
+    "id": "chatcmpl-3072dfa0-5f04-4c2b-aca5-10a3281de0c3",
+    "created": 1742559959,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "Why",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-3072dfa0-5f04-4c2b-aca5-10a3281de0c3",
+    "created": 1742559959,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": " don't scientists trust atoms?\n\nBecause they make up",
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-3072dfa0-5f04-4c2b-aca5-10a3281de0c3",
+    "created": 1742559959,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": " everything!\n\nWould you like to hear another one?",
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-3072dfa0-5f04-4c2b-aca5-10a3281de0c3",
+    "created": 1742559959,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": null,
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  }
+]

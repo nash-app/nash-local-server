@@ -1,0 +1,31 @@
+---
+description: Dependency management
+globs: *.py
+alwaysApply: false
+---
+ # Project Rules
+
+## Dependency Management
+
+This project uses `pyproject.toml` for dependency management instead of `requirements.txt`. This is the modern Python packaging standard that provides better dependency resolution and project metadata management.
+
+### Adding New Dependencies
+
+When adding new dependencies to the project, use `poetry add`
+
+### Development Dependencies
+
+Development dependencies should be added to the `[tool.poetry.group.dev.dependencies]` section:
+
+```toml
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0.0"
+black = ">=22.0.0"
+isort = ">=5.0.0"
+```
+
+### Installing Dependencies
+
+```bash
+poetry install
+```

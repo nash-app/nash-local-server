@@ -1,0 +1,30 @@
+---
+description: Where to find files in this repo
+globs: *.py
+alwaysApply: false
+---
+ # File Organization Rules
+
+## Client-Server Files
+
+### LLM Client
+
+- The LLM client must be maintained in a single file at `llm_client.py`
+- No alternate versions (e.g., `python:llm_client.py`) should be created
+- If changes are needed, modify the main file directly
+- Use version control (git) for tracking changes instead of creating duplicate files
+
+### File Locations
+
+- Client: `client_example.py` in the root directory
+- Server: `app/server.py` in the app directory
+- Tests: `tests/` directory
+- Configuration: `.env` for environment variables, `pyproject.toml` for dependencies
+
+### Best Practices
+
+1. Always work on the canonical file paths
+2. Use git branches for experimental changes
+3. Use meaningful commit messages to track file evolution
+4. Run tests before committing changes
+5. Document significant changes in commit messages

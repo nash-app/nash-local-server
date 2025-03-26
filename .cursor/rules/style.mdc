@@ -1,0 +1,9 @@
+---
+description: Linting guidelines
+globs: *.py
+alwaysApply: false
+---
+# Linting guidelines
+
+- No trailing spaces at the end of lines
+- Two newlines before function definitions

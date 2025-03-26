@@ -1,0 +1,228 @@
+[
+  {
+    "id": "chatcmpl-9fe59a4a-72d8-4585-be07-7ca476b4eb39",
+    "created": 1742559281,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "I'll check",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-9fe59a4a-72d8-4585-be07-7ca476b4eb39",
+    "created": 1742559281,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": " what Python modules are installed and then execute a simple",
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-9fe59a4a-72d8-4585-be07-7ca476b4eb39",
+    "created": 1742559281,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": " \"Hello World\" program for",
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-9fe59a4a-72d8-4585-be07-7ca476b4eb39",
+    "created": 1742559281,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": " you.",
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null,
+    "citations": null
+  },
+  {
+    "id": "chatcmpl-9fe59a4a-72d8-4585-be07-7ca476b4eb39",
+    "created": 1742559282,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": "toolu_01RmRc5Vhz7GwxkuEPe5M8Mu",
+              "function": {
+                "arguments": "",
+                "name": "list_installed_packages"
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-9fe59a4a-72d8-4585-be07-7ca476b4eb39",
+    "created": 1742559282,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-9fe59a4a-72d8-4585-be07-7ca476b4eb39",
+    "created": 1742559282,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": "",
+          "role": "assistant",
+          "function_call": null,
+          "tool_calls": [
+            {
+              "id": null,
+              "function": {
+                "arguments": "{}",
+                "name": null
+              },
+              "type": "function",
+              "index": 0
+            }
+          ],
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  },
+  {
+    "id": "chatcmpl-9fe59a4a-72d8-4585-be07-7ca476b4eb39",
+    "created": 1742559282,
+    "model": "claude-3-7-sonnet-latest",
+    "object": "chat.completion.chunk",
+    "system_fingerprint": null,
+    "choices": [
+      {
+        "finish_reason": "tool_calls",
+        "index": 0,
+        "delta": {
+          "provider_specific_fields": null,
+          "content": null,
+          "role": null,
+          "function_call": null,
+          "tool_calls": null,
+          "audio": null
+        },
+        "logprobs": null
+      }
+    ],
+    "provider_specific_fields": null,
+    "stream_options": null
+  }
+]
